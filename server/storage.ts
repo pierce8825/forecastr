@@ -3,6 +3,7 @@ import {
   Forecast, InsertForecast,
   RevenueDriver, InsertRevenueDriver,
   RevenueStream, InsertRevenueStream,
+  RevenueDriverToStream, InsertRevenueDriverToStream,
   Expense, InsertExpense,
   Department, InsertDepartment,
   PersonnelRole, InsertPersonnelRole,
@@ -38,6 +39,14 @@ export interface IStorage {
   createRevenueStream(stream: InsertRevenueStream): Promise<RevenueStream>;
   updateRevenueStream(id: number, stream: Partial<InsertRevenueStream>): Promise<RevenueStream | undefined>;
   deleteRevenueStream(id: number): Promise<boolean>;
+  
+  // Revenue Driver to Stream Mapping operations
+  getDriverStreamMappingsByForecastId(forecastId: number): Promise<(RevenueDriverToStream & { driver: RevenueDriver, stream: RevenueStream })[]>;
+  getDriverStreamMappingsByDriverId(driverId: number): Promise<(RevenueDriverToStream & { stream: RevenueStream })[]>;
+  getDriverStreamMappingsByStreamId(streamId: number): Promise<(RevenueDriverToStream & { driver: RevenueDriver })[]>;
+  createDriverStreamMapping(mapping: InsertRevenueDriverToStream): Promise<RevenueDriverToStream>;
+  updateDriverStreamMapping(id: number, mapping: Partial<InsertRevenueDriverToStream>): Promise<RevenueDriverToStream | undefined>;
+  deleteDriverStreamMapping(id: number): Promise<boolean>;
   
   // Expense operations
   getExpensesByForecastId(forecastId: number): Promise<Expense[]>;
@@ -87,6 +96,7 @@ export class MemStorage implements IStorage {
   private forecasts: Map<number, Forecast>;
   private revenueDrivers: Map<number, RevenueDriver>;
   private revenueStreams: Map<number, RevenueStream>;
+  private driverStreamMappings: Map<number, RevenueDriverToStream>;
   private expenses: Map<number, Expense>;
   private departments: Map<number, Department>;
   private personnelRoles: Map<number, PersonnelRole>;
@@ -98,6 +108,7 @@ export class MemStorage implements IStorage {
   private currentForecastId: number;
   private currentRevenueDriverId: number;
   private currentRevenueStreamId: number;
+  private currentDriverStreamMappingId: number;
   private currentExpenseId: number;
   private currentDepartmentId: number;
   private currentPersonnelRoleId: number;
@@ -110,6 +121,7 @@ export class MemStorage implements IStorage {
     this.forecasts = new Map();
     this.revenueDrivers = new Map();
     this.revenueStreams = new Map();
+    this.driverStreamMappings = new Map();
     this.expenses = new Map();
     this.departments = new Map();
     this.personnelRoles = new Map();
@@ -121,6 +133,7 @@ export class MemStorage implements IStorage {
     this.currentForecastId = 1;
     this.currentRevenueDriverId = 1;
     this.currentRevenueStreamId = 1;
+    this.currentDriverStreamMappingId = 1;
     this.currentExpenseId = 1;
     this.currentDepartmentId = 1;
     this.currentPersonnelRoleId = 1;

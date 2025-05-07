@@ -199,6 +199,23 @@ export const insertFinancialProjectionSchema = createInsertSchema(financialProje
   updatedAt: true,
 });
 
+// Revenue Driver to Stream Mapping schema
+export const revenueDriverToStream = pgTable("revenue_driver_to_stream", {
+  id: serial("id").primaryKey(),
+  driverId: integer("driver_id").notNull(),
+  streamId: integer("stream_id").notNull(),
+  formula: text("formula"), // Optional formula to calculate how the driver affects the stream
+  multiplier: numeric("multiplier", { precision: 15, scale: 4 }), // e.g., ARPU value
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertRevenueDriverToStreamSchema = createInsertSchema(revenueDriverToStream).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 // Export types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -211,6 +228,9 @@ export type InsertRevenueDriver = z.infer<typeof insertRevenueDriverSchema>;
 
 export type RevenueStream = typeof revenueStreams.$inferSelect;
 export type InsertRevenueStream = z.infer<typeof insertRevenueStreamSchema>;
+
+export type RevenueDriverToStream = typeof revenueDriverToStream.$inferSelect;
+export type InsertRevenueDriverToStream = z.infer<typeof insertRevenueDriverToStreamSchema>;
 
 export type Expense = typeof expenses.$inferSelect;
 export type InsertExpense = z.infer<typeof insertExpenseSchema>;
