@@ -6,6 +6,7 @@ import {
   insertForecastSchema, 
   insertRevenueDriverSchema, 
   insertRevenueStreamSchema,
+  insertRevenueDriverToStreamSchema,
   insertExpenseSchema,
   insertDepartmentSchema,
   insertPersonnelRoleSchema,
@@ -273,6 +274,70 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const success = await storage.deleteRevenueStream(streamId);
     if (!success) {
       return res.status(404).json({ message: 'Revenue stream not found' });
+    }
+    
+    return res.status(204).end();
+  });
+  
+  // Revenue Driver to Stream Mapping routes
+  app.get('/api/driver-stream-mappings', async (req: Request, res: Response) => {
+    const forecastId = Number(req.query.forecastId);
+    const driverId = Number(req.query.driverId);
+    const streamId = Number(req.query.streamId);
+    
+    if (forecastId && !isNaN(forecastId)) {
+      const mappings = await storage.getDriverStreamMappingsByForecastId(forecastId);
+      return res.json(mappings);
+    } else if (driverId && !isNaN(driverId)) {
+      const mappings = await storage.getDriverStreamMappingsByDriverId(driverId);
+      return res.json(mappings);
+    } else if (streamId && !isNaN(streamId)) {
+      const mappings = await storage.getDriverStreamMappingsByStreamId(streamId);
+      return res.json(mappings);
+    } else {
+      return res.status(400).json({ message: 'Invalid or missing forecast ID, driver ID, or stream ID' });
+    }
+  });
+  
+  app.post('/api/driver-stream-mappings', async (req: Request, res: Response) => {
+    try {
+      const mappingData = insertRevenueDriverToStreamSchema.parse(req.body);
+      const mapping = await storage.createDriverStreamMapping(mappingData);
+      return res.status(201).json(mapping);
+    } catch (err) {
+      return handleValidationError(err, res);
+    }
+  });
+  
+  app.put('/api/driver-stream-mappings/:id', async (req: Request, res: Response) => {
+    try {
+      const mappingId = parseInt(req.params.id);
+      if (isNaN(mappingId)) {
+        return res.status(400).json({ message: 'Invalid mapping ID' });
+      }
+      
+      const mappingData = insertRevenueDriverToStreamSchema.partial().parse(req.body);
+      const updatedMapping = await storage.updateDriverStreamMapping(mappingId, mappingData);
+      
+      if (!updatedMapping) {
+        return res.status(404).json({ message: 'Driver-stream mapping not found' });
+      }
+      
+      return res.json(updatedMapping);
+    } catch (err) {
+      return handleValidationError(err, res);
+    }
+  });
+  
+  app.delete('/api/driver-stream-mappings/:id', async (req: Request, res: Response) => {
+    const mappingId = parseInt(req.params.id);
+    if (isNaN(mappingId)) {
+      return res.status(400).json({ message: 'Invalid mapping ID' });
+    }
+    
+    const success = await storage.deleteDriverStreamMapping(mappingId);
+    if (!success) {
+      return res.status(404).json({ message: 'Driver-stream mapping not found' });
     }
     
     return res.status(204).end();

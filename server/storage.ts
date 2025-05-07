@@ -233,7 +233,37 @@ export class MemStorage implements IStorage {
       }
     ];
     
-    demoRevenueStreams.forEach(stream => this.createRevenueStream(stream));
+    const streams = demoRevenueStreams.map(stream => this.createRevenueStream(stream));
+    
+    // Create demo driver-stream mappings
+    const demoDriverStreamMappings: InsertRevenueDriverToStream[] = [
+      {
+        driverId: 1,  // Monthly Active Users
+        streamId: 1,  // Subscription Revenue
+        formula: "value * 0.058 * 89",  // MAU * conversion rate * ARPU
+        multiplier: "1"
+      },
+      {
+        driverId: 2,  // Conversion Rate
+        streamId: 1,  // Subscription Revenue
+        formula: "45200 * value * 89",  // MAU * conversion rate * ARPU
+        multiplier: "1"
+      },
+      {
+        driverId: 3,  // ARPU
+        streamId: 1,  // Subscription Revenue
+        formula: "45200 * 0.058 * value",  // MAU * conversion rate * ARPU
+        multiplier: "1"
+      },
+      {
+        driverId: 1,  // Monthly Active Users
+        streamId: 2,  // Service Revenue
+        formula: "value * 0.01 * 100",  // MAU * 1% * $100
+        multiplier: "1"
+      }
+    ];
+    
+    demoDriverStreamMappings.forEach(mapping => this.createDriverStreamMapping(mapping));
     
     // Create demo departments
     const demoDepartments: InsertDepartment[] = [
@@ -537,6 +567,91 @@ export class MemStorage implements IStorage {
   
   async deleteRevenueStream(id: number): Promise<boolean> {
     return this.revenueStreams.delete(id);
+  }
+  
+  // Revenue Driver to Stream Mapping methods
+  async getDriverStreamMappingsByForecastId(forecastId: number): Promise<(RevenueDriverToStream & { driver: RevenueDriver, stream: RevenueStream })[]> {
+    const allMappings = Array.from(this.driverStreamMappings.values());
+    const result: (RevenueDriverToStream & { driver: RevenueDriver, stream: RevenueStream })[] = [];
+    
+    for (const mapping of allMappings) {
+      const driver = await this.getRevenueDriver(mapping.driverId);
+      const stream = await this.getRevenueStream(mapping.streamId);
+      
+      if (driver && stream && driver.forecastId === forecastId && stream.forecastId === forecastId) {
+        result.push({
+          ...mapping,
+          driver,
+          stream
+        });
+      }
+    }
+    
+    return result;
+  }
+  
+  async getDriverStreamMappingsByDriverId(driverId: number): Promise<(RevenueDriverToStream & { stream: RevenueStream })[]> {
+    const allMappings = Array.from(this.driverStreamMappings.values());
+    const result: (RevenueDriverToStream & { stream: RevenueStream })[] = [];
+    
+    for (const mapping of allMappings) {
+      if (mapping.driverId === driverId) {
+        const stream = await this.getRevenueStream(mapping.streamId);
+        if (stream) {
+          result.push({
+            ...mapping,
+            stream
+          });
+        }
+      }
+    }
+    
+    return result;
+  }
+  
+  async getDriverStreamMappingsByStreamId(streamId: number): Promise<(RevenueDriverToStream & { driver: RevenueDriver })[]> {
+    const allMappings = Array.from(this.driverStreamMappings.values());
+    const result: (RevenueDriverToStream & { driver: RevenueDriver })[] = [];
+    
+    for (const mapping of allMappings) {
+      if (mapping.streamId === streamId) {
+        const driver = await this.getRevenueDriver(mapping.driverId);
+        if (driver) {
+          result.push({
+            ...mapping,
+            driver
+          });
+        }
+      }
+    }
+    
+    return result;
+  }
+  
+  async createDriverStreamMapping(insertMapping: InsertRevenueDriverToStream): Promise<RevenueDriverToStream> {
+    const id = this.currentDriverStreamMappingId++;
+    const now = new Date();
+    const mapping: RevenueDriverToStream = { ...insertMapping, id, createdAt: now, updatedAt: now };
+    this.driverStreamMappings.set(id, mapping);
+    return mapping;
+  }
+  
+  async updateDriverStreamMapping(id: number, updateData: Partial<InsertRevenueDriverToStream>): Promise<RevenueDriverToStream | undefined> {
+    const mapping = this.driverStreamMappings.get(id);
+    if (!mapping) return undefined;
+    
+    const updatedMapping: RevenueDriverToStream = {
+      ...mapping,
+      ...updateData,
+      updatedAt: new Date()
+    };
+    
+    this.driverStreamMappings.set(id, updatedMapping);
+    return updatedMapping;
+  }
+  
+  async deleteDriverStreamMapping(id: number): Promise<boolean> {
+    return this.driverStreamMappings.delete(id);
   }
   
   // Expense methods
