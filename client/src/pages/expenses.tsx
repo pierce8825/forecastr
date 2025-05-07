@@ -182,7 +182,9 @@ const Expenses = () => {
           variables = {
             ...variables,
             headcount: Number(personnel.count) || 0,
-            salary: Number(personnel.annualSalary) || 0
+            salary: Number(personnel.annualSalary) || 0,
+            avg_salary: personnel.count > 0 ? Number(personnel.annualSalary) / personnel.count : 0,
+            benefits_cost: Number(personnel.annualSalary) * 0.2 // Assuming 20% benefits
           };
         }
       } else if (linkType === 'driver' && linkedId && revenueDrivers?.length > 0) {
@@ -190,7 +192,10 @@ const Expenses = () => {
         if (driver) {
           variables = {
             ...variables,
-            value: Number(driver.value) || 0
+            value: Number(driver.value) || 0,
+            growth_rate: Number(driver.growthRate) || 0,
+            min_value: Number(driver.minValue) || 0,
+            max_value: Number(driver.maxValue) || 100
           };
         }
       } else if (linkType === 'stream' && linkedId && revenueStreams?.length > 0) {
@@ -198,29 +203,72 @@ const Expenses = () => {
         if (stream) {
           variables = {
             ...variables,
-            amount: Number(stream.amount) || 0
+            amount: Number(stream.amount) || 0,
+            growth_rate: Number(stream.growthRate) || 0
           };
         }
       }
       
-      // Use formula parser to calculate
-      const { formulaParser } = await import('@/lib/formula-parser');
+      // Add some useful variables for calculations
+      const now = new Date();
+      variables = {
+        ...variables,
+        current_month: now.getMonth() + 1, // 1-12
+        current_year: now.getFullYear(),
+        current_day: now.getDate()
+      };
+      
+      // Import the enhanced formula parser
+      const { formulaParser, availableFunctions } = await import('@/lib/formula-parser');
       formulaParser.setVariables(variables);
       
-      if (formulaParser.validate(formula)) {
-        const result = formulaParser.evaluate(formula);
-        setFormulaPreview(result);
+      // Validate with detailed error information
+      const validation = formulaParser.validateWithDetails(formula);
+      
+      if (validation.isValid) {
+        try {
+          const result = formulaParser.evaluate(formula);
+          setFormulaPreview(result);
+        } catch (evalError) {
+          // Format error message to be more user-friendly
+          let errorMessage = evalError.message;
+          if (errorMessage.includes('Error evaluating formula')) {
+            errorMessage = errorMessage.replace('Error evaluating formula: ', '');
+          }
+          setFormulaPreview(`Error: ${errorMessage}`);
+        }
       } else {
-        setFormulaPreview('Invalid formula');
+        // Use the detailed error information
+        const error = validation.error;
+        let errorMessage = 'Invalid formula';
+        
+        if (error) {
+          if (error.type === 'syntax') {
+            errorMessage = `Syntax error: ${error.details || error.message}`;
+          } else if (error.type === 'reference') {
+            errorMessage = `Reference error: ${error.details || error.message}`;
+          } else if (error.type === 'circular') {
+            errorMessage = `Circular dependency detected`;
+          } else {
+            errorMessage = error.message;
+          }
+          
+          if (error.suggestion) {
+            errorMessage += ` ${error.suggestion}`;
+          }
+        }
+        
+        setFormulaPreview(errorMessage);
       }
     } catch (error) {
       console.error("Formula calculation error:", error);
-      setFormulaPreview('Error calculating');
+      const errorMessage = error.message || "Unknown error calculating formula";
+      setFormulaPreview(`Error: ${errorMessage}`);
     }
   };
   
   // Form handlers
-  const handleAddExpense = (e) => {
+  const handleAddExpense = async (e) => {
     e.preventDefault();
     const formData = new FormData(e.target);
     
@@ -241,10 +289,88 @@ const Expenses = () => {
     
     // Handle formula and amount
     if (useFormula) {
-      expenseData.formula = formData.get("formula");
-      expenseData.amount = formulaPreview ? Number(formulaPreview) : 0; // Use previewed amount or default to 0
+      const formulaText = formData.get("formula") as string;
+      expenseData.formula = formulaText;
+      
+      // Validate formula again before submitting
+      if (formulaText && formulaText.trim()) {
+        try {
+          // Import the enhanced formula parser
+          const { formulaParser } = await import('@/lib/formula-parser');
+          
+          // Prepare variables
+          let variables = {};
+          if (linkType === 'personnel' && expenseData.linkedPersonnelId) {
+            const personnel = personnelRoles?.find(p => p.id === expenseData.linkedPersonnelId);
+            if (personnel) {
+              variables = {
+                ...variables,
+                headcount: Number(personnel.count) || 0,
+                salary: Number(personnel.annualSalary) || 0
+              };
+            }
+          } else if (linkType === 'driver' && expenseData.linkedDriverId) {
+            const driver = revenueDrivers?.find(d => d.id === expenseData.linkedDriverId);
+            if (driver) {
+              variables = {
+                ...variables,
+                value: Number(driver.value) || 0
+              };
+            }
+          } else if (linkType === 'stream' && expenseData.linkedStreamId) {
+            const stream = revenueStreams?.find(s => s.id === expenseData.linkedStreamId);
+            if (stream) {
+              variables = {
+                ...variables,
+                amount: Number(stream.amount) || 0
+              };
+            }
+          }
+          
+          formulaParser.setVariables(variables);
+          const validation = formulaParser.validateWithDetails(formulaText);
+          
+          if (!validation.isValid) {
+            toast({
+              title: "Formula Error",
+              description: validation.error?.message || "Invalid formula",
+              variant: "destructive",
+            });
+            return; // Prevent submission
+          }
+          
+          // If valid, calculate result
+          const result = formulaParser.evaluate(formulaText);
+          expenseData.amount = result;
+        } catch (error) {
+          toast({
+            title: "Formula Error",
+            description: error instanceof Error ? error.message : "Error calculating formula",
+            variant: "destructive",
+          });
+          return; // Prevent submission
+        }
+      } else {
+        // If formula is empty but formula mode is enabled
+        toast({
+          title: "Formula Error",
+          description: "Please enter a formula or disable formula mode",
+          variant: "destructive",
+        });
+        return; // Prevent submission
+      }
     } else {
-      expenseData.amount = Number(formData.get("amount"));
+      // Normal amount entry
+      const amountValue = formData.get("amount");
+      if (!amountValue) {
+        toast({
+          title: "Validation Error",
+          description: "Please enter an amount",
+          variant: "destructive",
+        });
+        return; // Prevent submission
+      }
+      expenseData.amount = Number(amountValue);
     }
     
     // Add linked items based on selection
@@ -792,10 +918,32 @@ const Expenses = () => {
                       onChange={(e) => handleFormulaPreview(e.target.value)}
                     />
                     <div className="text-sm text-muted-foreground">
-                      {linkType === "personnel" && "Variables: headcount, salary"}
-                      {linkType === "driver" && "Variables: value"}
-                      {linkType === "stream" && "Variables: amount"}
-                      {linkType === "none" && "Use standard mathematical operations (*, +, -, /, etc.)"}
+                      <p className="mb-1">
+                        {linkType === "personnel" && "Available variables: headcount, salary, avg_salary, benefits_cost"}
+                        {linkType === "driver" && "Available variables: value, growth_rate, min_value, max_value"}
+                        {linkType === "stream" && "Available variables: amount, growth_rate"}
+                        {linkType === "none" && "Use any of the financial and mathematical functions below"}
+                      </p>
+                      <details>
+                        <summary className="cursor-pointer text-xs font-medium">
+                          View available functions
+                        </summary>
+                        <div className="mt-2 text-xs space-y-1 max-h-32 overflow-y-auto border border-gray-200 rounded p-2 bg-gray-50">
+                          <p className="font-semibold">Business Functions:</p>
+                          <p>cagr(beginValue, endValue, years) - Compound annual growth rate</p>
+                          <p>markup(cost, price) - Calculate markup percentage</p>
+                          <p>margin(revenue, cost) - Calculate profit margin</p>
+                          <p>annualToMonthly(annualRate) - Convert annual to monthly rate</p>
+                          <p>roi(gain, cost) - Return on investment</p>
+                          <p>breakEven(fixedCosts, unitPrice, unitVariableCost) - Break-even point</p>
+                          <p className="font-semibold mt-2">Mathematical Functions:</p>
+                          <p>min(a, b, ...) - Minimum value</p>
+                          <p>max(a, b, ...) - Maximum value</p>
+                          <p>mean(a, b, ...) - Average of values</p>
+                          <p>round(value) - Round to nearest integer</p>
+                          <p>roundTo(value, decimals) - Round to specific decimal places</p>
+                        </div>
+                      </details>
                     </div>
                     {formulaPreview !== null && (
                       <div className="text-sm">
