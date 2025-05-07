@@ -204,17 +204,22 @@ const Revenue = () => {
     },
   });
 
+  // State for revenue stream type
+  const [streamType, setStreamType] = useState("subscription");
+  
   // Form handlers
   const handleAddRevenueStream = (e) => {
     e.preventDefault();
     const formData = new FormData(e.target);
+    const type = formData.get("type");
     
     addRevenueStreamMutation.mutate({
       forecastId,
       name: formData.get("name"),
-      type: formData.get("type"),
+      type: type,
       amount: formData.get("amount"),
-      frequency: formData.get("frequency"),
+      // If one-time, set frequency to null
+      frequency: type === "one-time" ? null : formData.get("frequency"),
       growthRate: formData.get("growthRate"),
       category: formData.get("category"),
     });
@@ -563,7 +568,11 @@ const Revenue = () => {
                 <Label htmlFor="type" className="text-right">
                   Type
                 </Label>
-                <Select name="type" defaultValue="subscription">
+                <Select 
+                  name="type" 
+                  defaultValue="subscription"
+                  onValueChange={setStreamType}
+                >
                   <SelectTrigger className="col-span-3">
                     <SelectValue placeholder="Select type" />
                   </SelectTrigger>
@@ -592,13 +601,17 @@ const Revenue = () => {
                   />
                 </div>
               </div>
-              <div className="grid grid-cols-4 items-center gap-4">
+              <div className={`grid grid-cols-4 items-center gap-4 ${streamType === "one-time" ? "opacity-50" : ""}`}>
                 <Label htmlFor="frequency" className="text-right">
                   Frequency
                 </Label>
-                <Select name="frequency" defaultValue="annual">
+                <Select 
+                  name="frequency" 
+                  defaultValue="annual"
+                  disabled={streamType === "one-time"}
+                >
                   <SelectTrigger className="col-span-3">
-                    <SelectValue placeholder="Select frequency" />
+                    <SelectValue placeholder={streamType === "one-time" ? "N/A for one-time" : "Select frequency"} />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="monthly">Monthly</SelectItem>
