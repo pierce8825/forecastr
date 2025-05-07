@@ -7,6 +7,13 @@ export interface FormulaEntity {
   type: 'stream' | 'driver' | 'expense' | 'personnel';
 }
 
+export interface FormulaError {
+  message: string;
+  type: 'syntax' | 'circular' | 'reference' | 'calculation';
+  details?: string;
+  position?: number;
+}
+
 export class FormulaParser {
   private variables: Record<string, number> = {};
   private entityMap: Map<string, FormulaEntity> = new Map();
@@ -156,17 +163,79 @@ export class FormulaParser {
   /**
    * Validate a formula without evaluating it
    * @param formula The formula to validate
-   * @returns True if the formula is valid, false otherwise
+   * @returns Object with validation result and error information if invalid
    */
-  validate(formula: string): boolean {
+  validateWithDetails(formula: string): { isValid: boolean; error?: FormulaError } {
     try {
+      // Check for empty formula
+      if (!formula.trim()) {
+        return { 
+          isValid: false, 
+          error: {
+            message: 'Formula cannot be empty',
+            type: 'syntax'
+          }
+        };
+      }
+      
+      // Check for balanced parentheses
+      const openParens = (formula.match(/\(/g) || []).length;
+      const closeParens = (formula.match(/\)/g) || []).length;
+      if (openParens !== closeParens) {
+        return { 
+          isValid: false, 
+          error: {
+            message: 'Unbalanced parentheses',
+            type: 'syntax',
+            details: `Found ${openParens} opening parentheses and ${closeParens} closing parentheses`
+          }
+        };
+      }
+
+      // Check for invalid references
+      const refRegex = /(stream|driver|expense|personnel)_(\d+)/g;
+      let match;
+      while ((match = refRegex.exec(formula)) !== null) {
+        const type = match[1];
+        const id = parseInt(match[2], 10);
+        const key = `${type}_${id}`;
+        
+        if (!this.entityMap.has(key)) {
+          return { 
+            isValid: false, 
+            error: {
+              message: `Invalid reference: ${key}`,
+              type: 'reference',
+              details: `The referenced ${type} with ID ${id} does not exist`,
+              position: match.index
+            }
+          };
+        }
+      }
+      
       // Replace variable names with 1 to check syntax
       const testFormula = this.replaceVariablesWithValues(formula, {});
       math.evaluate(testFormula);
-      return true;
+      return { isValid: true };
     } catch (error) {
-      return false;
+      return { 
+        isValid: false, 
+        error: {
+          message: 'Syntax error in formula',
+          type: 'syntax',
+          details: error.message
+        }
+      };
     }
+  }
+  
+  /**
+   * Simple validation that returns just a boolean
+   * @param formula The formula to validate
+   * @returns True if the formula is valid, false otherwise
+   */
+  validate(formula: string): boolean {
+    return this.validateWithDetails(formula).isValid;
   }
 
   /**
@@ -176,10 +245,37 @@ export class FormulaParser {
    */
   evaluate(formula: string): number {
     try {
+      const validation = this.validateWithDetails(formula);
+      if (!validation.isValid) {
+        throw new Error(validation.error?.message || 'Invalid formula');
+      }
+      
       const formulaWithValues = this.replaceVariablesWithValues(formula, this.variables);
       return math.evaluate(formulaWithValues);
     } catch (error) {
       throw new Error(`Error evaluating formula: ${error.message}`);
+    }
+  }
+  
+  /**
+   * Format a formula to make it more readable
+   * @param formula The formula to format
+   * @returns The formatted formula
+   */
+  formatFormula(formula: string): string {
+    try {
+      // Replace operators with spaces around them
+      let formatted = formula
+        .replace(/([+\-*\/=><])/g, ' $1 ')   // Add spaces around operators
+        .replace(/\s+/g, ' ')               // Normalize spaces
+        .replace(/\( /g, '(')               // Remove space after opening parenthesis
+        .replace(/ \)/g, ')')               // Remove space before closing parenthesis
+        .trim();
+        
+      return formatted;
+    } catch {
+      // If any error occurs, return the original formula
+      return formula;
     }
   }
 

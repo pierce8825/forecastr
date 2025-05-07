@@ -130,7 +130,9 @@ export const personnelRoles = pgTable("personnel_roles", {
   count: integer("count").notNull(),
   plannedCount: integer("planned_count").notNull(),
   annualSalary: numeric("annual_salary", { precision: 12, scale: 2 }).notNull(),
-  startingMonth: integer("starting_month"), // month number (1-12)
+  startDate: timestamp("start_date"), // When the role starts
+  endDate: timestamp("end_date"), // When the role ends (optional)
+  startingMonth: integer("starting_month"), // Legacy: month number (1-12)
   benefits: numeric("benefits", { precision: 5, scale: 4 }), // percentage of salary
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow().notNull(),

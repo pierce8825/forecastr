@@ -7,6 +7,9 @@ export interface EntityValue {
   value: number;
   formula?: string | null;
   referenceName: string; // e.g., "stream_1", "driver_2"
+  startDate?: Date | null;
+  endDate?: Date | null;
+  isActive?: boolean; // Whether the entity is active based on date range
 }
 
 /**
@@ -24,7 +27,18 @@ export class FormulaBuildingService {
    */
   registerEntity(entity: EntityValue): void {
     const key = `${entity.type}_${entity.id}`;
-    this.entities.set(key, entity);
+    
+    // Check if entity is active based on dates
+    const now = new Date();
+    const isActive = this.isEntityActive(entity, now);
+    
+    // Update the entity with active status
+    const updatedEntity = {
+      ...entity,
+      isActive
+    };
+    
+    this.entities.set(key, updatedEntity);
     
     // Register with the formula parser for dependency tracking
     const formulaEntity: FormulaEntity = {
@@ -34,6 +48,31 @@ export class FormulaBuildingService {
       type: entity.type
     };
     formulaParser.registerEntity(formulaEntity);
+  }
+  
+  /**
+   * Check if an entity is active based on its start and end dates
+   * @param entity The entity to check
+   * @param referenceDate The date to check against (usually current date)
+   * @returns True if the entity is active, false otherwise
+   */
+  private isEntityActive(entity: EntityValue, referenceDate: Date): boolean {
+    // If no dates are specified, entity is always active
+    if (!entity.startDate && !entity.endDate) {
+      return true;
+    }
+    
+    // Check start date
+    if (entity.startDate && new Date(entity.startDate) > referenceDate) {
+      return false; // Not active yet
+    }
+    
+    // Check end date
+    if (entity.endDate && new Date(entity.endDate) < referenceDate) {
+      return false; // No longer active
+    }
+    
+    return true; // Active within date range
   }
 
   /**
@@ -135,8 +174,12 @@ export class FormulaBuildingService {
     
     let value: number;
     
+    // If entity is not active based on date range, return 0
+    if (entity.isActive === false) {
+      value = 0;
+    }
     // If entity has a formula, evaluate it
-    if (entity.formula) {
+    else if (entity.formula) {
       // Prepare variables for formula evaluation
       const variables: Record<string, number> = {};
       
@@ -154,7 +197,7 @@ export class FormulaBuildingService {
         const dependency = this.entities.get(dependencyKey);
         
         if (dependency) {
-          // Calculate the dependency's value
+          // Calculate the dependency's value (will be 0 if not active)
           const dependencyValue = this.calculateEntity(dependency);
           variables[referenceName] = dependencyValue;
         } else {
@@ -167,6 +210,12 @@ export class FormulaBuildingService {
       if (entity.type === 'personnel') {
         variables['headcount'] = entity.value;
       }
+      
+      // Add date-related variables
+      const now = new Date();
+      variables['current_month'] = now.getMonth() + 1; // 1-12
+      variables['current_year'] = now.getFullYear();
+      variables['current_day'] = now.getDate();
       
       // Evaluate the formula
       formulaParser.setVariables(variables);
