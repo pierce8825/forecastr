@@ -1,7 +1,17 @@
 import * as math from 'mathjs';
 
+export interface FormulaEntity {
+  id: number;
+  name: string;
+  formula?: string | null;
+  type: 'stream' | 'driver' | 'expense' | 'personnel';
+}
+
 export class FormulaParser {
   private variables: Record<string, number> = {};
+  private entityMap: Map<string, FormulaEntity> = new Map();
+  private dependencyGraph: Map<number, Set<number>> = new Map();
+  private calculationStack: Set<number> = new Set();
 
   /**
    * Set variables to be used in formula evaluation
@@ -18,6 +28,129 @@ export class FormulaParser {
    */
   setVariable(name: string, value: number): void {
     this.variables[name] = value;
+  }
+
+  /**
+   * Register an entity for dependency tracking
+   * @param entity The entity to register
+   */
+  registerEntity(entity: FormulaEntity): void {
+    const key = `${entity.type}_${entity.id}`;
+    this.entityMap.set(key, entity);
+    
+    // Initialize dependency graph entry if it doesn't exist
+    if (!this.dependencyGraph.has(entity.id)) {
+      this.dependencyGraph.set(entity.id, new Set());
+    }
+    
+    // If this entity has a formula, update the dependency graph
+    if (entity.formula) {
+      const dependencies = this.extractEntityReferences(entity.formula);
+      dependencies.forEach(depId => {
+        this.dependencyGraph.get(entity.id)?.add(depId);
+      });
+    }
+  }
+
+  /**
+   * Clear all registered entities and dependencies
+   */
+  clearEntities(): void {
+    this.entityMap.clear();
+    this.dependencyGraph.clear();
+  }
+
+  /**
+   * Check if there are circular dependencies in the registered entities
+   * @returns True if circular dependencies are detected, false otherwise
+   */
+  hasCircularDependencies(): boolean {
+    // For each entity, try to do a DFS traversal to see if we find a cycle
+    for (const [entityId] of this.dependencyGraph) {
+      this.calculationStack.clear();
+      if (this.detectCircularDependency(entityId)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Get the entities involved in circular dependencies, if any
+   * @returns Array of entities involved in circular dependencies, or empty array
+   */
+  getCircularDependencies(): FormulaEntity[] {
+    const circularEntities: FormulaEntity[] = [];
+    
+    // For each entity, try to do a DFS traversal to see if we find a cycle
+    for (const [entityId] of this.dependencyGraph) {
+      this.calculationStack.clear();
+      if (this.detectCircularDependency(entityId)) {
+        // Add all entities in the current calculation stack
+        this.calculationStack.forEach(id => {
+          for (const [key, entity] of this.entityMap) {
+            if (entity.id === id) {
+              circularEntities.push(entity);
+            }
+          }
+        });
+        break;
+      }
+    }
+    
+    return circularEntities;
+  }
+
+  /**
+   * Helper for circular dependency detection
+   * @param entityId The ID of the entity to check
+   * @returns True if a circular dependency is detected, false otherwise
+   */
+  private detectCircularDependency(entityId: number): boolean {
+    // If we've already seen this entity in current calculation path, there's a cycle
+    if (this.calculationStack.has(entityId)) {
+      return true;
+    }
+    
+    // Add this entity to calculation stack
+    this.calculationStack.add(entityId);
+    
+    // Check all dependencies
+    const dependencies = this.dependencyGraph.get(entityId);
+    if (dependencies) {
+      for (const depId of dependencies) {
+        if (this.detectCircularDependency(depId)) {
+          return true;
+        }
+      }
+    }
+    
+    // Remove from stack as we exit this branch
+    this.calculationStack.delete(entityId);
+    
+    return false;
+  }
+
+  /**
+   * Extract entity references from a formula (e.g., "stream_1", "driver_2")
+   * @param formula The formula to analyze
+   * @returns Array of entity IDs referenced in the formula
+   */
+  private extractEntityReferences(formula: string): number[] {
+    const entityRefs: number[] = [];
+    
+    // Match patterns like "stream_123", "driver_45", etc.
+    const refRegex = /(stream|driver|expense|personnel)_(\d+)/g;
+    let match;
+    
+    while ((match = refRegex.exec(formula)) !== null) {
+      const entityId = parseInt(match[2], 10);
+      if (!isNaN(entityId)) {
+        entityRefs.push(entityId);
+      }
+    }
+    
+    return entityRefs;
   }
 
   /**

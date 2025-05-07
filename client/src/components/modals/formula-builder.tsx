@@ -1,234 +1,521 @@
-import { useState } from "react";
-import { useFormula } from "@/hooks/use-formula";
+import { useState, useEffect } from 'react';
 import {
   Dialog,
+  DialogTitle,
   DialogContent,
+  DialogHeader,
   DialogDescription,
   DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Parentheses } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { AlertCircle, AlertTriangle, ChevronRight, Plus, X } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { formulaParser } from '@/lib/formula-parser';
+import { FormulaBuildingService, EntityValue, formulaBuildingService } from '@/lib/formula-building-service';
 
 interface FormulaBuilderProps {
-  forecastId: number;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  onSave?: (formula: any) => void;
-  variables?: { name: string; description?: string }[];
-  initialFormula?: {
-    id?: number;
-    name: string;
-    formula: string;
-    description?: string;
-    category?: string;
-  };
+  isOpen: boolean;
+  onClose: () => void;
+  onSave: (formula: string, calculatedValue: number) => void;
+  entityType: 'stream' | 'driver' | 'expense' | 'personnel';
+  entityId: number;
+  initialFormula?: string;
+  streams?: any[];
+  drivers?: any[];
+  expenses?: any[];
+  personnel?: any[];
 }
 
-const FormulaBuilder = ({
-  forecastId,
-  open,
-  onOpenChange,
+export default function FormulaBuilder({
+  isOpen,
+  onClose,
   onSave,
-  variables = [],
-  initialFormula,
-}: FormulaBuilderProps) => {
-  const [name, setName] = useState(initialFormula?.name || "");
-  const [formula, setFormula] = useState(initialFormula?.formula || "");
-  const [description, setDescription] = useState(initialFormula?.description || "");
-  const [category, setCategory] = useState(initialFormula?.category || "");
-  const { saveFormula, validateFormula, isValidating } = useFormula(forecastId);
-  const { toast } = useToast();
+  entityType,
+  entityId,
+  initialFormula = '',
+  streams = [],
+  drivers = [],
+  expenses = [],
+  personnel = []
+}: FormulaBuilderProps) {
+  const [formula, setFormula] = useState(initialFormula);
+  const [calculatedValue, setCalculatedValue] = useState<number | null>(null);
+  const [activeTab, setActiveTab] = useState<string>("variables");
+  const [variableSearch, setVariableSearch] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [warning, setWarning] = useState<string | null>(null);
+  const [selectedEntity, setSelectedEntity] = useState<EntityValue | null>(null);
+  const [circularDependencies, setCircularDependencies] = useState<EntityValue[]>([]);
+  
+  // Operators for formula building
+  const operators = ['+', '-', '*', '/', '(', ')', '=', '>', '<', '>=', '<='];
+  const functions = ['sum', 'min', 'max', 'avg', 'round', 'floor', 'ceil'];
+  
+  // Initialize service with entities
+  useEffect(() => {
+    formulaBuildingService.calculateAll();
 
-  // Default variables if none are provided
-  const defaultVariables = [
-    { name: "Revenue", description: "Total revenue" },
-    { name: "Expenses", description: "Total expenses" },
-    { name: "User Count", description: "Number of users" },
-    { name: "Conversion Rate", description: "User conversion rate" },
-    { name: "ARPU", description: "Average revenue per user" },
-    { name: "CAC", description: "Customer acquisition cost" },
-  ];
-
-  const availableVariables = variables.length > 0 ? variables : defaultVariables;
-
-  const handleInsertVariable = (variable: string) => {
-    setFormula(prev => {
-      const cursorPosition = document.getElementById("formula-expression")?.selectionStart || prev.length;
-      return prev.substring(0, cursorPosition) + variable + prev.substring(cursorPosition);
+    // Register all entities
+    streams.forEach(stream => {
+      formulaBuildingService.registerEntity({
+        id: stream.id,
+        type: 'stream',
+        name: stream.name,
+        value: Number(stream.amount) || 0,
+        formula: stream.formula,
+        referenceName: `stream_${stream.id}`
+      });
     });
     
-    // Focus back on the formula input
-    setTimeout(() => {
-      const formulaInput = document.getElementById("formula-expression") as HTMLInputElement;
-      if (formulaInput) {
-        formulaInput.focus();
-        formulaInput.selectionStart = formulaInput.selectionEnd = 
-          (formulaInput.selectionStart || 0) + variable.length;
-      }
-    }, 0);
-  };
-
-  const handleSave = async () => {
-    if (!name.trim() || !formula.trim()) {
-      toast({
-        title: "Validation Error",
-        description: "Formula name and expression are required",
-        variant: "destructive",
+    drivers.forEach(driver => {
+      formulaBuildingService.registerEntity({
+        id: driver.id,
+        type: 'driver',
+        name: driver.name,
+        value: Number(driver.value) || 0,
+        formula: driver.formula,
+        referenceName: `driver_${driver.id}`
       });
+    });
+    
+    expenses.forEach(expense => {
+      formulaBuildingService.registerEntity({
+        id: expense.id,
+        type: 'expense',
+        name: expense.name,
+        value: Number(expense.amount) || 0,
+        formula: expense.formula,
+        referenceName: `expense_${expense.id}`
+      });
+    });
+    
+    personnel.forEach(person => {
+      formulaBuildingService.registerEntity({
+        id: person.id,
+        type: 'personnel',
+        name: person.title,
+        value: Number(person.count) || 0,
+        formula: null,
+        referenceName: `personnel_${person.id}`
+      });
+    });
+    
+    // Return cleanup function
+    return () => {
+      // Cleanup logic if needed
+    };
+  }, [streams, drivers, expenses, personnel]);
+  
+  // Try to calculate formula when it changes
+  useEffect(() => {
+    calculateFormula();
+  }, [formula]);
+  
+  // Calculate formula and check for circular dependencies
+  const calculateFormula = () => {
+    if (!formula.trim()) {
+      setCalculatedValue(null);
+      setError(null);
+      setWarning(null);
+      setCircularDependencies([]);
       return;
     }
-
+    
     try {
-      // Validate the formula
-      const isValid = await validateFormula(formula);
-      
-      if (!isValid) {
-        toast({
-          title: "Invalid Formula",
-          description: "The formula expression is not valid",
-          variant: "destructive",
-        });
+      // Check if formula is valid syntax
+      if (!formulaParser.validate(formula)) {
+        setError("Invalid formula syntax");
+        setCalculatedValue(null);
         return;
       }
-
-      // Save the formula
-      const savedFormula = await saveFormula({
-        id: initialFormula?.id,
-        name,
-        formula,
-        description,
-        category,
-      });
-
-      if (onSave) {
-        onSave(savedFormula);
+      
+      // Check for circular dependencies
+      if (formulaBuildingService.checkCircularDependencies()) {
+        const circular = formulaBuildingService.getCircularEntities();
+        setCircularDependencies(circular);
+        setWarning("Circular reference detected");
+      } else {
+        setCircularDependencies([]);
+        setWarning(null);
       }
-
-      toast({
-        title: "Success",
-        description: "Formula saved successfully",
-      });
-
-      onOpenChange(false);
+      
+      // Prepare variables for calculation
+      const variables: Record<string, number> = {};
+      
+      // Extract entity references
+      const regex = /(stream|driver|expense|personnel)_(\d+)/g;
+      let match;
+      
+      while ((match = regex.exec(formula)) !== null) {
+        const type = match[1];
+        const id = parseInt(match[2], 10);
+        const referenceName = match[0];
+        
+        // Get entity value
+        let value = 0;
+        
+        if (type === 'stream') {
+          const stream = streams.find(s => s.id === id);
+          value = stream ? Number(stream.amount) || 0 : 0;
+        } else if (type === 'driver') {
+          const driver = drivers.find(d => d.id === id);
+          value = driver ? Number(driver.value) || 0 : 0;
+        } else if (type === 'expense') {
+          const expense = expenses.find(e => e.id === id);
+          value = expense ? Number(expense.amount) || 0 : 0;
+        } else if (type === 'personnel') {
+          const person = personnel.find(p => p.id === id);
+          value = person ? Number(person.count) || 0 : 0;
+        }
+        
+        variables[referenceName] = value;
+      }
+      
+      // Add common variables
+      if (entityType === 'personnel') {
+        const person = personnel.find(p => p.id === entityId);
+        if (person) {
+          variables['headcount'] = Number(person.count) || 0;
+          variables['salary'] = Number(person.annualSalary) || 0;
+        }
+      }
+      
+      // Evaluate formula
+      formulaParser.setVariables(variables);
+      const result = formulaParser.evaluate(formula);
+      setCalculatedValue(result);
+      setError(null);
     } catch (error) {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to save formula",
-        variant: "destructive",
-      });
+      console.error("Formula calculation error:", error);
+      setError("Error calculating formula: " + (error as Error).message);
+      setCalculatedValue(null);
     }
   };
-
+  
+  // Insert variable into formula
+  const insertVariable = (variable: string) => {
+    // Insert at cursor position or append to end
+    const textArea = document.querySelector('[name="formula"]') as HTMLTextAreaElement | null;
+    
+    if (textArea) {
+      const selectionStart = textArea.selectionStart;
+      const selectionEnd = textArea.selectionEnd;
+      const textBefore = formula.substring(0, selectionStart);
+      const textAfter = formula.substring(selectionEnd);
+      
+      const newFormula = textBefore + variable + textAfter;
+      setFormula(newFormula);
+      
+      // Set focus back to textarea and move cursor after inserted variable
+      setTimeout(() => {
+        textArea.focus();
+        const newPosition = selectionStart + variable.length;
+        textArea.setSelectionRange(newPosition, newPosition);
+      }, 10);
+    } else {
+      // No text area found, just append to formula
+      setFormula((prevFormula) => prevFormula + variable);
+    }
+  };
+  
+  // Filter variables by search term
+  const filterVariables = (items: any[], type: string) => {
+    if (!variableSearch) return items;
+    const lowerSearch = variableSearch.toLowerCase();
+    return items.filter(item => 
+      item.name?.toLowerCase().includes(lowerSearch) || 
+      item.title?.toLowerCase().includes(lowerSearch)
+    );
+  };
+  
+  // Check if entity is the current one being edited (to prevent self-reference)
+  const isSelf = (type: string, id: number) => {
+    return type === entityType && id === entityId;
+  };
+  
+  // Handle save
+  const handleSave = () => {
+    if (calculatedValue !== null) {
+      onSave(formula, calculatedValue);
+      onClose();
+    }
+  };
+  
+  // Variable categories
+  const variableCategories = [
+    { id: 'streams', label: 'Revenue Streams', items: streams, type: 'stream' },
+    { id: 'drivers', label: 'Revenue Drivers', items: drivers, type: 'driver' },
+    { id: 'expenses', label: 'Expenses', items: expenses, type: 'expense' },
+    { id: 'personnel', label: 'Personnel', items: personnel, type: 'personnel' },
+  ];
+  
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-[900px] max-h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>Formula Builder</DialogTitle>
           <DialogDescription>
-            Create a custom formula to calculate and track key financial metrics.
+            Create a formula by adding variables, operators, and functions
           </DialogDescription>
         </DialogHeader>
-        <div className="grid gap-4 py-4">
-          <div className="grid gap-2">
-            <Label htmlFor="formula-name">Formula Name</Label>
-            <Input
-              id="formula-name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="E.g., Adjusted Revenue"
-            />
+        
+        <div className="grid grid-cols-5 gap-4 flex-grow overflow-hidden">
+          {/* Left panel: Variables and operators */}
+          <div className="col-span-2 border rounded-md overflow-hidden flex flex-col">
+            <Tabs defaultValue="variables" value={activeTab} onValueChange={setActiveTab} className="flex flex-col h-full">
+              <TabsList className="grid grid-cols-3">
+                <TabsTrigger value="variables">Variables</TabsTrigger>
+                <TabsTrigger value="operators">Operators</TabsTrigger>
+                <TabsTrigger value="functions">Functions</TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="variables" className="flex-grow flex flex-col overflow-hidden">
+                <div className="p-2">
+                  <Input 
+                    placeholder="Search variables..." 
+                    value={variableSearch}
+                    onChange={(e) => setVariableSearch(e.target.value)}
+                  />
+                </div>
+                
+                <ScrollArea className="flex-grow">
+                  <div className="p-2 space-y-4">
+                    {variableCategories.map(category => (
+                      <div key={category.id}>
+                        <h3 className="font-medium mb-1">{category.label}</h3>
+                        <div className="space-y-1">
+                          {filterVariables(category.items, category.type).length > 0 ? (
+                            filterVariables(category.items, category.type).map(item => {
+                              const id = item.id;
+                              const name = item.name || item.title;
+                              const referenceName = `${category.type}_${id}`;
+                              const isCurrentEntity = isSelf(category.type, id);
+                              
+                              return (
+                                <div 
+                                  key={referenceName}
+                                  className={`flex items-center justify-between p-1 rounded hover:bg-muted ${isCurrentEntity ? 'opacity-50' : ''}`}
+                                >
+                                  <span className="text-sm truncate" title={name}>
+                                    {name}
+                                  </span>
+                                  <Button 
+                                    variant="ghost" 
+                                    size="sm"
+                                    onClick={() => insertVariable(referenceName)}
+                                    disabled={isCurrentEntity}
+                                    title={isCurrentEntity ? "Cannot reference self" : `Add ${name} to formula`}
+                                  >
+                                    <Plus className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              );
+                            })
+                          ) : (
+                            <div className="text-sm text-muted-foreground p-1">
+                              No {category.label.toLowerCase()} found
+                            </div>
+                          )}
+                        </div>
+                        <Separator className="my-2" />
+                      </div>
+                    ))}
+                    
+                    {/* Common variables based on entity type */}
+                    {entityType === 'personnel' && (
+                      <div>
+                        <h3 className="font-medium mb-1">Personnel Variables</h3>
+                        <div className="space-y-1">
+                          <div className="flex items-center justify-between p-1 rounded hover:bg-muted">
+                            <span className="text-sm">Headcount</span>
+                            <Button variant="ghost" size="sm" onClick={() => insertVariable('headcount')}>
+                              <Plus className="h-4 w-4" />
+                            </Button>
+                          </div>
+                          <div className="flex items-center justify-between p-1 rounded hover:bg-muted">
+                            <span className="text-sm">Annual Salary</span>
+                            <Button variant="ghost" size="sm" onClick={() => insertVariable('salary')}>
+                              <Plus className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </ScrollArea>
+              </TabsContent>
+              
+              <TabsContent value="operators" className="flex-grow overflow-auto">
+                <div className="grid grid-cols-3 gap-2 p-4">
+                  {operators.map(operator => (
+                    <Button 
+                      key={operator} 
+                      variant="outline" 
+                      className="h-12"
+                      onClick={() => insertVariable(` ${operator} `)}
+                    >
+                      {operator}
+                    </Button>
+                  ))}
+                </div>
+              </TabsContent>
+              
+              <TabsContent value="functions" className="flex-grow overflow-auto">
+                <div className="p-4 space-y-2">
+                  {functions.map(func => (
+                    <Button 
+                      key={func} 
+                      variant="outline" 
+                      className="w-full justify-between"
+                      onClick={() => insertVariable(`${func}()`)}
+                    >
+                      {func}
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  ))}
+                </div>
+              </TabsContent>
+            </Tabs>
           </div>
           
-          <div className="grid gap-2">
-            <Label htmlFor="formula-expression">Formula Expression</Label>
-            <div className="flex rounded-md shadow-sm">
-              <Input
-                id="formula-expression"
-                value={formula}
-                onChange={(e) => setFormula(e.target.value)}
-                placeholder="Revenue * (1 - Discount Rate)"
-                className="rounded-r-none"
-              />
-              <Button
-                type="button"
-                variant="outline"
-                className="rounded-l-none border-l-0"
-              >
-                <Parentheses className="h-4 w-4" />
-              </Button>
+          {/* Right panel: Formula editor and preview */}
+          <div className="col-span-3 flex flex-col space-y-4">
+            <div>
+              <Label htmlFor="formula" className="text-muted-foreground text-sm">
+                Formula
+              </Label>
+              <div className="mt-1">
+                <Input
+                  name="formula"
+                  value={formula}
+                  onChange={(e) => setFormula(e.target.value)}
+                  className="font-mono"
+                  placeholder="Build your formula..."
+                />
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Use variables from the left panel, combined with operators and functions.
+              </p>
             </div>
-            <p className="text-xs text-muted-foreground">
-              Use operators like +, -, *, /, (, ) and variables from below
-            </p>
-          </div>
-          
-          <div className="grid gap-2">
-            <Label>Available Variables</Label>
-            <div className="grid grid-cols-2 gap-2">
-              {availableVariables.map((variable, index) => (
-                <Button
-                  key={index}
-                  type="button"
-                  variant="outline"
-                  className="text-left justify-start font-normal h-auto py-2"
-                  onClick={() => handleInsertVariable(variable.name)}
-                >
-                  {variable.name}
-                  {variable.description && (
-                    <span className="text-xs text-muted-foreground ml-1">
-                      ({variable.description})
-                    </span>
-                  )}
-                </Button>
-              ))}
+            
+            {/* Preview */}
+            <div className="flex-grow">
+              <Label className="text-muted-foreground text-sm">Preview</Label>
+              <div className="mt-1 p-4 border rounded-md h-[150px] overflow-auto bg-slate-50">
+                {error ? (
+                  <Alert variant="destructive">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertTitle>Error</AlertTitle>
+                    <AlertDescription>{error}</AlertDescription>
+                  </Alert>
+                ) : formula ? (
+                  <div>
+                    <div className="text-xl font-semibold">
+                      {calculatedValue !== null ? `$${calculatedValue.toLocaleString()}` : 'Calculating...'}
+                    </div>
+                    
+                    {warning && (
+                      <Alert className="mt-2 border-amber-500 bg-amber-50 text-amber-800">
+                        <AlertTriangle className="h-4 w-4" />
+                        <AlertTitle>Warning</AlertTitle>
+                        <AlertDescription>{warning}</AlertDescription>
+                      </Alert>
+                    )}
+                    
+                    {circularDependencies.length > 0 && (
+                      <div className="mt-2">
+                        <p className="text-sm font-medium text-amber-600">Circular References Detected:</p>
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {circularDependencies.map((entity, index) => (
+                            <Badge key={index} variant="outline" className="bg-amber-50">
+                              {entity.name}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-muted-foreground text-sm">
+                    Enter a formula to see the preview
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
-          
-          <div className="grid gap-2">
-            <Label htmlFor="formula-description">Description (Optional)</Label>
-            <Input
-              id="formula-description"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Describe what this formula calculates"
-            />
-          </div>
-          
-          <div className="grid gap-2">
-            <Label htmlFor="formula-category">Category (Optional)</Label>
-            <Input
-              id="formula-category"
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-              placeholder="E.g., Revenue, Metrics, KPI"
-            />
+            
+            {/* Referenced entities */}
+            <div>
+              <Label className="text-muted-foreground text-sm">Referenced Entities</Label>
+              <div className="mt-1 border rounded-md p-2 min-h-[60px] max-h-[120px] overflow-auto bg-slate-50">
+                {formula ? (
+                  <div className="flex flex-wrap gap-2">
+                    {/* Extract referenced entities from formula */}
+                    {(formula.match(/(stream|driver|expense|personnel)_\d+/g) || []).map((ref, index) => {
+                      const [type, id] = ref.split('_');
+                      let entity;
+                      
+                      switch (type) {
+                        case 'stream':
+                          entity = streams.find(s => s.id === parseInt(id));
+                          break;
+                        case 'driver':
+                          entity = drivers.find(d => d.id === parseInt(id));
+                          break;
+                        case 'expense':
+                          entity = expenses.find(e => e.id === parseInt(id));
+                          break;
+                        case 'personnel':
+                          entity = personnel.find(p => p.id === parseInt(id));
+                          break;
+                      }
+                      
+                      const name = entity ? (entity.name || entity.title) : 'Unknown';
+                      
+                      return (
+                        <Badge 
+                          key={index} 
+                          variant="outline" 
+                          className="flex gap-1 items-center"
+                          title={name}
+                        >
+                          {name}
+                          <X 
+                            className="h-3 w-3 cursor-pointer" 
+                            onClick={() => setFormula(formula.replace(new RegExp(ref, 'g'), ''))}
+                          />
+                        </Badge>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="text-muted-foreground text-sm p-2">
+                    No entities referenced
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         </div>
+        
         <DialogFooter>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => onOpenChange(false)}
-          >
+          <Button variant="outline" onClick={onClose}>
             Cancel
           </Button>
           <Button 
-            type="button" 
-            onClick={handleSave}
-            disabled={isValidating || !name.trim() || !formula.trim()}
+            onClick={handleSave} 
+            disabled={calculatedValue === null || error !== null}
           >
-            {isValidating ? "Validating..." : "Save Formula"}
+            {error ? 'Formula Has Errors' : warning ? 'Save Anyway' : 'Save Formula'}
           </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
   );
-};
-
-export default FormulaBuilder;
+}

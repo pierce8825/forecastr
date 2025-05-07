@@ -11,6 +11,8 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { apiRequest } from "@/lib/queryClient";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
+import FormulaBuilder from "@/components/modals/formula-builder";
 import { 
   LineChart, 
   Line, 
@@ -31,7 +33,8 @@ import {
   BarChart2,
   BarChart as BarChartIcon,
   PieChart,
-  Settings
+  Settings,
+  Calculator
 } from "lucide-react";
 import { Helmet } from "react-helmet";
 import {
@@ -59,8 +62,8 @@ const Revenue = () => {
   const [isAddStreamDialogOpen, setIsAddStreamDialogOpen] = useState(false);
   const [isAddDriverDialogOpen, setIsAddDriverDialogOpen] = useState(false);
   const [isMappingDialogOpen, setIsMappingDialogOpen] = useState(false);
-  const [selectedDriverId, setSelectedDriverId] = useState(null);
-  const [selectedStreamId, setSelectedStreamId] = useState(null);
+  const [selectedDriverId, setSelectedDriverId] = useState<number | null>(null);
+  const [selectedStreamId, setSelectedStreamId] = useState<number | null>(null);
   const queryClient = useQueryClient();
   const { toast } = useToast();
   
@@ -204,8 +207,36 @@ const Revenue = () => {
     },
   });
 
-  // State for revenue stream type
+  // State for revenue stream type and formula
   const [streamType, setStreamType] = useState("subscription");
+  const [useFormula, setUseFormula] = useState(false);
+  const [isFormulaBuilderOpen, setIsFormulaBuilderOpen] = useState(false);
+  const [formulaValue, setFormulaValue] = useState<string>('');
+  const [calculatedAmount, setCalculatedAmount] = useState<number | null>(null);
+  
+  // Fetch expenses for formula builder
+  const { data: expenses } = useQuery({
+    queryKey: ["/api/expenses", { forecastId }],
+    queryFn: async () => {
+      if (!forecastId) throw new Error("No forecast selected");
+      const res = await fetch(`/api/expenses?forecastId=${forecastId}`);
+      if (!res.ok) throw new Error("Failed to fetch expenses");
+      return res.json();
+    },
+    enabled: !!forecastId,
+  });
+  
+  // Fetch personnel for formula builder
+  const { data: personnel } = useQuery({
+    queryKey: ["/api/personnel-roles", { forecastId }],
+    queryFn: async () => {
+      if (!forecastId) throw new Error("No forecast selected");
+      const res = await fetch(`/api/personnel-roles?forecastId=${forecastId}`);
+      if (!res.ok) throw new Error("Failed to fetch personnel roles");
+      return res.json();
+    },
+    enabled: !!forecastId,
+  });
   
   // Form handlers
   const handleAddRevenueStream = (e) => {
@@ -213,16 +244,37 @@ const Revenue = () => {
     const formData = new FormData(e.target);
     const type = formData.get("type");
     
-    addRevenueStreamMutation.mutate({
+    const streamData: any = {
       forecastId,
       name: formData.get("name"),
       type: type,
-      amount: formData.get("amount"),
       // If one-time, set frequency to null
       frequency: type === "one-time" ? null : formData.get("frequency"),
       growthRate: formData.get("growthRate"),
       category: formData.get("category"),
-    });
+    };
+    
+    // Add formula if using formula calculation
+    if (useFormula && formulaValue) {
+      streamData.formula = formulaValue;
+      streamData.amount = calculatedAmount || 0;
+    } else {
+      streamData.amount = formData.get("amount");
+      streamData.formula = null;
+    }
+    
+    addRevenueStreamMutation.mutate(streamData);
+  };
+  
+  // Formula builder handlers
+  const handleOpenFormulaBuilder = () => {
+    setIsFormulaBuilderOpen(true);
+  };
+  
+  const handleSaveFormula = (formula: string, value: number) => {
+    setFormulaValue(formula);
+    setCalculatedAmount(value);
+    setIsFormulaBuilderOpen(false);
   };
 
   const handleAddRevenueDriver = async (e) => {
@@ -584,23 +636,67 @@ const Revenue = () => {
                 </Select>
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="amount" className="text-right">
-                  Amount
+                <Label className="text-right" htmlFor="useFormula">
+                  Use Formula
                 </Label>
-                <div className="col-span-3 flex">
-                  <span className="inline-flex items-center px-3 rounded-l-md border border-r-0 border-gray-300 bg-gray-50 text-gray-500 sm:text-sm">
-                    $
-                  </span>
-                  <Input
-                    id="amount"
-                    name="amount"
-                    type="number"
-                    className="rounded-l-none"
+                <div className="flex items-center gap-2 col-span-3">
+                  <Checkbox 
+                    id="useFormula" 
+                    checked={useFormula} 
+                    onCheckedChange={(checked) => setUseFormula(!!checked)} 
+                  />
+                  <Label htmlFor="useFormula" className="cursor-pointer">
+                    Calculate amount using a formula
+                  </Label>
+                </div>
+              </div>
+              
+              {useFormula ? (
+                <div className="grid grid-cols-4 items-start gap-4">
+                  <Label className="text-right pt-2">
+                    Formula
+                  </Label>
+                  <div className="col-span-3">
+                    <div className="flex flex-col gap-2">
+                      <div className="flex items-center gap-2">
+                        <Input value={formulaValue} readOnly placeholder="No formula set" />
+                        <Button 
+                          type="button" 
+                          variant="outline" 
+                          size="icon"
+                          onClick={handleOpenFormulaBuilder}
+                        >
+                          <Calculator className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      {calculatedAmount !== null && (
+                        <div className="text-sm">
+                          Calculated value: <span className="font-semibold">${calculatedAmount.toLocaleString()}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="amount" className="text-right">
+                    Amount
+                  </Label>
+                  <div className="col-span-3 flex">
+                    <span className="inline-flex items-center px-3 rounded-l-md border border-r-0 border-gray-300 bg-gray-50 text-gray-500 sm:text-sm">
+                      $
+                    </span>
+                    <Input
+                      id="amount"
+                      name="amount"
+                      type="number"
+                      className="rounded-l-none"
                     min="0"
                     step="1000"
                   />
                 </div>
               </div>
+              )}
               <div className={`grid grid-cols-4 items-center gap-4 ${streamType === "one-time" ? "opacity-50" : ""}`}>
                 <Label htmlFor="frequency" className="text-right">
                   Frequency
@@ -820,7 +916,7 @@ const Revenue = () => {
                 </Label>
                 <div className="col-span-3">
                   <Select 
-                    value={selectedDriverId} 
+                    value={selectedDriverId?.toString()} 
                     onValueChange={(value) => setSelectedDriverId(Number(value))}
                   >
                     <SelectTrigger>
@@ -842,7 +938,7 @@ const Revenue = () => {
                 </Label>
                 <div className="col-span-3">
                   <Select 
-                    value={selectedStreamId} 
+                    value={selectedStreamId?.toString()} 
                     onValueChange={(value) => setSelectedStreamId(Number(value))}
                   >
                     <SelectTrigger>
@@ -897,6 +993,19 @@ const Revenue = () => {
           </form>
         </DialogContent>
       </Dialog>
+      {/* Formula Builder Modal */}
+      <FormulaBuilder
+        isOpen={isFormulaBuilderOpen}
+        onClose={() => setIsFormulaBuilderOpen(false)}
+        onSave={handleSaveFormula}
+        entityType="stream"
+        entityId={0} // This will be set when editing an existing stream
+        initialFormula={formulaValue}
+        streams={revenueStreams || []}
+        drivers={revenueDrivers || []}
+        expenses={expenses || []}
+        personnel={personnel || []}
+      />
     </>
   );
 };
