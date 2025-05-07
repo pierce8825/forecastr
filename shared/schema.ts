@@ -85,6 +85,7 @@ export const expenses = pgTable("expenses", {
   forecastId: integer("forecast_id").notNull(),
   name: text("name").notNull(),
   amount: numeric("amount", { precision: 15, scale: 2 }).notNull(),
+  formula: text("formula"), // Optional formula for calculating the amount
   frequency: text("frequency").notNull(), // one-time, monthly, quarterly, annual
   category: text("category"), // marketing, software, office, etc.
   isCogsRelated: boolean("is_cogs_related").default(false),
@@ -92,6 +93,9 @@ export const expenses = pgTable("expenses", {
   endDate: timestamp("end_date"),
   growthRate: numeric("growth_rate", { precision: 6, scale: 4 }),
   notes: text("notes"),
+  linkedStreamId: integer("linked_stream_id"), // Optional link to revenue stream
+  linkedDriverId: integer("linked_driver_id"), // Optional link to revenue driver
+  linkedPersonnelId: integer("linked_personnel_id"), // Optional link to personnel role
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
