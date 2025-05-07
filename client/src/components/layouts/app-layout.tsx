@@ -191,11 +191,9 @@ const AppLayout = ({ children }: AppLayoutProps) => {
         <header className="bg-white shadow-sm z-10">
           <div className="flex items-center justify-between h-16 px-4 sm:px-6">
             <div className="flex items-center md:hidden">
-              <SheetTrigger asChild>
-                <Button variant="ghost" size="icon" onClick={() => setMobileMenuOpen(true)}>
-                  <Menu className="h-6 w-6" />
-                </Button>
-              </SheetTrigger>
+              <Button variant="ghost" size="icon" onClick={() => setMobileMenuOpen(true)}>
+                <Menu className="h-6 w-6" />
+              </Button>
             </div>
             
             <div className="flex items-center">
