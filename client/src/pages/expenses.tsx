@@ -109,19 +109,126 @@ const Expenses = () => {
     },
   });
 
+  // State for expense link type
+  const [linkType, setLinkType] = useState("none");
+  const [useFormula, setUseFormula] = useState(false);
+  const [formulaPreview, setFormulaPreview] = useState(null);
+  
+  // Fetch revenue streams, drivers, and personnel for linking
+  const { data: revenueStreams, isLoading: isLoadingStreams } = useQuery({
+    queryKey: ["/api/revenue-streams", { forecastId }],
+    queryFn: async () => {
+      if (!forecastId) throw new Error("No forecast selected");
+      const res = await fetch(`/api/revenue-streams?forecastId=${forecastId}`);
+      if (!res.ok) throw new Error("Failed to fetch revenue streams");
+      return res.json();
+    },
+    enabled: !!forecastId,
+  });
+  
+  const { data: revenueDrivers, isLoading: isLoadingDrivers } = useQuery({
+    queryKey: ["/api/revenue-drivers", { forecastId }],
+    queryFn: async () => {
+      if (!forecastId) throw new Error("No forecast selected");
+      const res = await fetch(`/api/revenue-drivers?forecastId=${forecastId}`);
+      if (!res.ok) throw new Error("Failed to fetch revenue drivers");
+      return res.json();
+    },
+    enabled: !!forecastId,
+  });
+  
+  const { data: personnelRoles, isLoading: isLoadingPersonnel } = useQuery({
+    queryKey: ["/api/personnel-roles", { forecastId }],
+    queryFn: async () => {
+      if (!forecastId) throw new Error("No forecast selected");
+      const res = await fetch(`/api/personnel-roles?forecastId=${forecastId}`);
+      if (!res.ok) throw new Error("Failed to fetch personnel roles");
+      return res.json();
+    },
+    enabled: !!forecastId,
+  });
+  
+  // Handle formula preview calculation
+  const handleFormulaPreview = async (formula) => {
+    if (!formula) {
+      setFormulaPreview(null);
+      return;
+    }
+    
+    try {
+      // Get personnel count if linking to personnel
+      let variables = {};
+      const linkedId = document.querySelector(
+        linkType === 'stream' ? 'select[name="linkedStreamId"]' : 
+        linkType === 'driver' ? 'select[name="linkedDriverId"]' : 
+        linkType === 'personnel' ? 'select[name="linkedPersonnelId"]' : null
+      )?.value;
+      
+      if (linkType === 'personnel' && linkedId) {
+        const personnel = personnelRoles?.find(p => p.id.toString() === linkedId);
+        if (personnel) {
+          variables.headcount = personnel.count;
+          variables.salary = Number(personnel.annualSalary);
+        }
+      } else if (linkType === 'driver' && linkedId) {
+        const driver = revenueDrivers?.find(d => d.id.toString() === linkedId);
+        if (driver) {
+          variables.value = Number(driver.value);
+        }
+      } else if (linkType === 'stream' && linkedId) {
+        const stream = revenueStreams?.find(s => s.id.toString() === linkedId);
+        if (stream) {
+          variables.amount = Number(stream.amount);
+        }
+      }
+      
+      // Use formula parser to calculate
+      const { formulaParser } = await import('@/lib/formula-parser');
+      formulaParser.setVariables(variables);
+      
+      if (formulaParser.validate(formula)) {
+        const result = formulaParser.evaluate(formula);
+        setFormulaPreview(result);
+      } else {
+        setFormulaPreview('Invalid formula');
+      }
+    } catch (error) {
+      setFormulaPreview('Error calculating');
+    }
+  };
+  
   // Form handlers
   const handleAddExpense = (e) => {
     e.preventDefault();
     const formData = new FormData(e.target);
     
-    addExpenseMutation.mutate({
+    // Prepare expense data
+    const expenseData = {
       forecastId,
       name: formData.get("name"),
-      amount: formData.get("amount"),
       frequency: formData.get("frequency"),
       category: formData.get("category"),
       isCogsRelated: formData.get("isCogsRelated") === "on",
-    });
+    };
+    
+    // Handle formula and amount
+    if (useFormula) {
+      expenseData.formula = formData.get("formula");
+      expenseData.amount = formulaPreview || 0; // Use previewed amount or default to 0
+    } else {
+      expenseData.amount = formData.get("amount");
+    }
+    
+    // Add linked items based on selection
+    if (linkType === "stream") {
+      expenseData.linkedStreamId = Number(formData.get("linkedStreamId"));
+    } else if (linkType === "driver") {
+      expenseData.linkedDriverId = Number(formData.get("linkedDriverId"));
+    } else if (linkType === "personnel") {
+      expenseData.linkedPersonnelId = Number(formData.get("linkedPersonnelId"));
+    }
+    
+    addExpenseMutation.mutate(expenseData);
   };
 
   // Filter expenses by category
@@ -405,13 +512,23 @@ const Expenses = () => {
                           <th className="py-3 px-2 text-right">Amount</th>
                           <th className="py-3 px-2 text-right">Frequency</th>
                           <th className="py-3 px-2 text-center">COGS</th>
+                          <th className="py-3 px-2 text-left">Linked To</th>
                           <th className="py-3 px-2 text-right">Actions</th>
                         </tr>
                       </thead>
                       <tbody>
                         {filteredExpenses?.map((expense) => (
                           <tr key={expense.id} className="border-b hover:bg-gray-50">
-                            <td className="py-3 px-2">{expense.name}</td>
+                            <td className="py-3 px-2">
+                              <div>
+                                {expense.name}
+                                {expense.formula && (
+                                  <div className="text-xs text-muted-foreground mt-1">
+                                    Formula: {expense.formula}
+                                  </div>
+                                )}
+                              </div>
+                            </td>
                             <td className="py-3 px-2">{expense.category || "Uncategorized"}</td>
                             <td className="py-3 px-2 text-right font-tabular">
                               ${Number(expense.amount).toLocaleString()}
@@ -420,7 +537,32 @@ const Expenses = () => {
                               {expense.frequency.charAt(0).toUpperCase() + expense.frequency.slice(1)}
                             </td>
                             <td className="py-3 px-2 text-center">
-                              {expense.isCogsRelated ? "Yes" : "No"}
+                              {expense.isCogsRelated ? (
+                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                  Yes
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                                  No
+                                </span>
+                              )}
+                            </td>
+                            <td className="py-3 px-2">
+                              {expense.linkedStreamId ? (
+                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                  Revenue Stream {expense.linkedStreamId}
+                                </span>
+                              ) : expense.linkedDriverId ? (
+                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                                  Revenue Driver {expense.linkedDriverId}
+                                </span>
+                              ) : expense.linkedPersonnelId ? (
+                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
+                                  Personnel {expense.linkedPersonnelId}
+                                </span>
+                              ) : (
+                                <span className="text-xs text-muted-foreground">None</span>
+                              )}
                             </td>
                             <td className="py-3 px-2 text-right">
                               <div className="flex justify-end gap-2">
@@ -445,8 +587,16 @@ const Expenses = () => {
       </div>
 
       {/* Add Expense Dialog */}
-      <Dialog open={isAddExpenseDialogOpen} onOpenChange={setIsAddExpenseDialogOpen}>
-        <DialogContent className="sm:max-w-[500px]">
+      <Dialog open={isAddExpenseDialogOpen} onOpenChange={(open) => {
+        setIsAddExpenseDialogOpen(open);
+        if (!open) {
+          // Reset state when dialog closes
+          setLinkType("none");
+          setUseFormula(false);
+          setFormulaPreview(null);
+        }
+      }}>
+        <DialogContent className="sm:max-w-[600px]">
           <DialogHeader>
             <DialogTitle>Add Expense</DialogTitle>
             <DialogDescription>
@@ -461,25 +611,179 @@ const Expenses = () => {
                 </Label>
                 <Input id="name" name="name" className="col-span-3" placeholder="Software Subscription" required />
               </div>
+              
+              {/* Link Type Selection */}
               <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="amount" className="text-right">
-                  Amount
+                <Label htmlFor="linkType" className="text-right">
+                  Link To
                 </Label>
-                <div className="col-span-3 flex">
-                  <span className="inline-flex items-center px-3 rounded-l-md border border-r-0 border-gray-300 bg-gray-50 text-gray-500 sm:text-sm">
-                    $
-                  </span>
-                  <Input
-                    id="amount"
-                    name="amount"
-                    type="number"
-                    className="rounded-l-none"
-                    min="0"
-                    step="0.01"
-                    required
+                <Select value={linkType} onValueChange={setLinkType}>
+                  <SelectTrigger className="col-span-3">
+                    <SelectValue placeholder="Select link type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No link</SelectItem>
+                    <SelectItem value="stream">Revenue Stream</SelectItem>
+                    <SelectItem value="driver">Revenue Driver</SelectItem>
+                    <SelectItem value="personnel">Personnel</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              {/* Dynamic Link Selection */}
+              {linkType === "stream" && (
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="linkedStreamId" className="text-right">
+                    Stream
+                  </Label>
+                  <Select name="linkedStreamId">
+                    <SelectTrigger className="col-span-3">
+                      <SelectValue placeholder="Select revenue stream" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {isLoadingStreams ? (
+                        <SelectItem value="" disabled>Loading streams...</SelectItem>
+                      ) : revenueStreams?.length > 0 ? (
+                        revenueStreams.map(stream => (
+                          <SelectItem key={stream.id} value={stream.id.toString()}>
+                            {stream.name} (${Number(stream.amount).toLocaleString()})
+                          </SelectItem>
+                        ))
+                      ) : (
+                        <SelectItem value="" disabled>No streams available</SelectItem>
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+              
+              {linkType === "driver" && (
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="linkedDriverId" className="text-right">
+                    Driver
+                  </Label>
+                  <Select name="linkedDriverId">
+                    <SelectTrigger className="col-span-3">
+                      <SelectValue placeholder="Select revenue driver" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {isLoadingDrivers ? (
+                        <SelectItem value="" disabled>Loading drivers...</SelectItem>
+                      ) : revenueDrivers?.length > 0 ? (
+                        revenueDrivers.map(driver => (
+                          <SelectItem key={driver.id} value={driver.id.toString()}>
+                            {driver.name} ({driver.value} {driver.unit})
+                          </SelectItem>
+                        ))
+                      ) : (
+                        <SelectItem value="" disabled>No drivers available</SelectItem>
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+              
+              {linkType === "personnel" && (
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="linkedPersonnelId" className="text-right">
+                    Personnel
+                  </Label>
+                  <Select name="linkedPersonnelId">
+                    <SelectTrigger className="col-span-3">
+                      <SelectValue placeholder="Select personnel role" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {isLoadingPersonnel ? (
+                        <SelectItem value="" disabled>Loading personnel...</SelectItem>
+                      ) : personnelRoles?.length > 0 ? (
+                        personnelRoles.map(role => (
+                          <SelectItem key={role.id} value={role.id.toString()}>
+                            {role.title} ({role.count} people)
+                          </SelectItem>
+                        ))
+                      ) : (
+                        <SelectItem value="" disabled>No personnel roles available</SelectItem>
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+              
+              {/* Toggle Formula Calculation */}
+              <div className="grid grid-cols-4 items-center gap-4">
+                <div className="col-span-4 flex items-center space-x-2">
+                  <Checkbox 
+                    id="useFormula" 
+                    checked={useFormula}
+                    onCheckedChange={(checked) => {
+                      setUseFormula(checked === true);
+                      if (!checked) {
+                        setFormulaPreview(null);
+                      }
+                    }}
                   />
+                  <Label htmlFor="useFormula">
+                    Use formula to calculate amount
+                  </Label>
                 </div>
               </div>
+              
+              {useFormula ? (
+                <div className="grid grid-cols-4 items-start gap-4">
+                  <Label htmlFor="formula" className="text-right mt-2">
+                    Formula
+                  </Label>
+                  <div className="col-span-3 space-y-2">
+                    <Input 
+                      id="formula" 
+                      name="formula" 
+                      placeholder={
+                        linkType === "personnel" ? "headcount * 50 (per-seat cost)" : 
+                        linkType === "driver" ? "value * 0.1 (percentage of driver)" :
+                        "Enter calculation formula"
+                      }
+                      onChange={(e) => handleFormulaPreview(e.target.value)}
+                    />
+                    <div className="text-sm text-muted-foreground">
+                      {linkType === "personnel" && "Variables: headcount, salary"}
+                      {linkType === "driver" && "Variables: value"}
+                      {linkType === "stream" && "Variables: amount"}
+                      {linkType === "none" && "Use standard mathematical operations (*, +, -, /, etc.)"}
+                    </div>
+                    {formulaPreview !== null && (
+                      <div className="text-sm">
+                        <span className="text-muted-foreground">Calculated Amount: </span>
+                        <span className="font-medium">
+                          {typeof formulaPreview === 'number' 
+                            ? `$${formulaPreview.toLocaleString()}`
+                            : formulaPreview}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="amount" className="text-right">
+                    Amount
+                  </Label>
+                  <div className="col-span-3 flex">
+                    <span className="inline-flex items-center px-3 rounded-l-md border border-r-0 border-gray-300 bg-gray-50 text-gray-500 sm:text-sm">
+                      $
+                    </span>
+                    <Input
+                      id="amount"
+                      name="amount"
+                      type="number"
+                      className="rounded-l-none"
+                      min="0"
+                      step="0.01"
+                      required={!useFormula}
+                    />
+                  </div>
+                </div>
+              )}
+              
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="frequency" className="text-right">
                   Frequency
@@ -526,7 +830,10 @@ const Expenses = () => {
               <Button type="button" variant="outline" onClick={() => setIsAddExpenseDialogOpen(false)}>
                 Cancel
               </Button>
-              <Button type="submit" disabled={addExpenseMutation.isPending}>
+              <Button 
+                type="submit" 
+                disabled={addExpenseMutation.isPending || (useFormula && typeof formulaPreview !== 'number')}
+              >
                 {addExpenseMutation.isPending ? "Adding..." : "Add Expense"}
               </Button>
             </DialogFooter>
