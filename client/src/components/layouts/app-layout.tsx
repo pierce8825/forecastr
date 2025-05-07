@@ -66,8 +66,8 @@ const AppLayout = ({ children }: AppLayoutProps) => {
           
           <div className="px-2 space-y-1">
             {navItems.map((item) => (
-              <Link key={item.path} href={item.path}>
-                <a 
+              <div key={item.path}>
+                <Link href={item.path} 
                   className={`flex items-center px-3 py-2 text-sm font-medium rounded-md ${
                     location === item.path 
                       ? "bg-blue-50 text-primary" 
@@ -76,8 +76,8 @@ const AppLayout = ({ children }: AppLayoutProps) => {
                 >
                   {item.icon}
                   {item.label}
-                </a>
-              </Link>
+                </Link>
+              </div>
             ))}
           </div>
           
@@ -85,12 +85,15 @@ const AppLayout = ({ children }: AppLayoutProps) => {
             <h3 className="px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Recent Models</h3>
             <div className="mt-2 space-y-1">
               {recentModels.map((model, index) => (
-                <Link key={index} href={model.path}>
-                  <a className="flex items-center px-3 py-2 text-sm font-medium rounded-md text-gray-700 hover:bg-gray-100">
+                <div key={index}>
+                  <Link 
+                    href={model.path}
+                    className="flex items-center px-3 py-2 text-sm font-medium rounded-md text-gray-700 hover:bg-gray-100"
+                  >
                     <FileText className="mr-3 h-5 w-5 text-gray-500" />
                     {model.name}
-                  </a>
-                </Link>
+                  </Link>
+                </div>
               ))}
             </div>
           </div>
@@ -129,8 +132,9 @@ const AppLayout = ({ children }: AppLayoutProps) => {
               
               <div className="px-2 space-y-1">
                 {navItems.map((item) => (
-                  <Link key={item.path} href={item.path}>
-                    <a 
+                  <div key={item.path}>
+                    <Link 
+                      href={item.path}
                       onClick={() => setMobileMenuOpen(false)}
                       className={`flex items-center px-3 py-2 text-sm font-medium rounded-md ${
                         location === item.path 
@@ -140,8 +144,8 @@ const AppLayout = ({ children }: AppLayoutProps) => {
                     >
                       {item.icon}
                       {item.label}
-                    </a>
-                  </Link>
+                    </Link>
+                  </div>
                 ))}
               </div>
               
@@ -149,15 +153,16 @@ const AppLayout = ({ children }: AppLayoutProps) => {
                 <h3 className="px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Recent Models</h3>
                 <div className="mt-2 space-y-1">
                   {recentModels.map((model, index) => (
-                    <Link key={index} href={model.path}>
-                      <a 
+                    <div key={index}>
+                      <Link 
+                        href={model.path}
                         onClick={() => setMobileMenuOpen(false)}
                         className="flex items-center px-3 py-2 text-sm font-medium rounded-md text-gray-700 hover:bg-gray-100"
                       >
                         <FileText className="mr-3 h-5 w-5 text-gray-500" />
                         {model.name}
-                      </a>
-                    </Link>
+                      </Link>
+                    </div>
                   ))}
                 </div>
               </div>
