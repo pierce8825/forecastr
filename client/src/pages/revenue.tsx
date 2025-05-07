@@ -10,6 +10,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { apiRequest } from "@/lib/queryClient";
+import { Badge } from "@/components/ui/badge";
 import { 
   LineChart, 
   Line, 
@@ -57,6 +58,9 @@ const Revenue = () => {
   const [activeTab, setActiveTab] = useState("streams");
   const [isAddStreamDialogOpen, setIsAddStreamDialogOpen] = useState(false);
   const [isAddDriverDialogOpen, setIsAddDriverDialogOpen] = useState(false);
+  const [isMappingDialogOpen, setIsMappingDialogOpen] = useState(false);
+  const [selectedDriverId, setSelectedDriverId] = useState(null);
+  const [selectedStreamId, setSelectedStreamId] = useState(null);
   const queryClient = useQueryClient();
   const { toast } = useToast();
   
@@ -95,6 +99,18 @@ const Revenue = () => {
       if (!forecastId) throw new Error("No forecast selected");
       const res = await fetch(`/api/revenue-drivers?forecastId=${forecastId}`);
       if (!res.ok) throw new Error("Failed to fetch revenue drivers");
+      return res.json();
+    },
+    enabled: !!forecastId,
+  });
+  
+  // Fetch driver-stream mappings
+  const { data: driverStreamMappings, isLoading: isLoadingMappings } = useQuery({
+    queryKey: ["/api/driver-stream-mappings", { forecastId }],
+    queryFn: async () => {
+      if (!forecastId) throw new Error("No forecast selected");
+      const res = await fetch(`/api/driver-stream-mappings?forecastId=${forecastId}`);
+      if (!res.ok) throw new Error("Failed to fetch driver-stream mappings");
       return res.json();
     },
     enabled: !!forecastId,
@@ -143,6 +159,50 @@ const Revenue = () => {
       });
     },
   });
+  
+  // Mutations for driver-stream mappings
+  const addDriverStreamMappingMutation = useMutation({
+    mutationFn: async (newMapping) => {
+      return await apiRequest("POST", "/api/driver-stream-mappings", newMapping);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/driver-stream-mappings"] });
+      setIsMappingDialogOpen(false);
+      setSelectedDriverId(null);
+      setSelectedStreamId(null);
+      toast({
+        title: "Mapping created",
+        description: "Revenue driver has been connected to stream successfully",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: `Failed to create mapping: ${error.message}`,
+        variant: "destructive",
+      });
+    },
+  });
+  
+  const deleteDriverStreamMappingMutation = useMutation({
+    mutationFn: async (id) => {
+      return await apiRequest("DELETE", `/api/driver-stream-mappings/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/driver-stream-mappings"] });
+      toast({
+        title: "Mapping deleted",
+        description: "Connection between driver and stream has been removed",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: `Failed to delete mapping: ${error.message}`,
+        variant: "destructive",
+      });
+    },
+  });
 
   // Form handlers
   const handleAddRevenueStream = (e) => {
@@ -173,6 +233,18 @@ const Revenue = () => {
       maxValue: formData.get("maxValue"),
       growthRate: formData.get("growthRate"),
       category: formData.get("category"),
+    });
+  };
+  
+  const handleAddMapping = (e) => {
+    e.preventDefault();
+    const formData = new FormData(e.target);
+    
+    addDriverStreamMappingMutation.mutate({
+      driverId: selectedDriverId,
+      streamId: selectedStreamId,
+      formula: formData.get("formula"),
+      multiplier: formData.get("multiplier"),
     });
   };
 
