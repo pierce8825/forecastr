@@ -255,7 +255,7 @@ const Revenue = () => {
     growthRate: Number(stream.growthRate) * 100,
   })) || [];
 
-  const isLoading = isLoadingStreams || isLoadingDrivers;
+  const isLoading = isLoadingStreams || isLoadingDrivers || isLoadingMappings;
 
   return (
     <>
@@ -477,6 +477,44 @@ const Revenue = () => {
                               <span>{driver.maxValue || 100}</span>
                             </div>
                           </div>
+                          
+                          {/* Linked Streams Display */}
+                          <div className="mt-4">
+                            <div className="flex justify-between items-center mb-2">
+                              <span className="text-xs font-medium text-gray-700">Connected Streams</span>
+                              <Button 
+                                variant="outline" 
+                                size="sm" 
+                                className="h-7 text-xs"
+                                onClick={() => {
+                                  setSelectedDriverId(driver.id);
+                                  setIsMappingDialogOpen(true);
+                                }}
+                              >
+                                Connect
+                              </Button>
+                            </div>
+                            <div className="flex flex-wrap gap-1">
+                              {driverStreamMappings
+                                ?.filter(mapping => mapping.driver.id === driver.id)
+                                .map(mapping => (
+                                  <Badge key={mapping.id} variant="secondary" className="text-xs flex items-center gap-1">
+                                    {mapping.stream.name}
+                                    <Button 
+                                      variant="ghost" 
+                                      size="sm" 
+                                      className="h-4 w-4 p-0 hover:bg-transparent"
+                                      onClick={() => deleteDriverStreamMappingMutation.mutate(mapping.id)}
+                                    >
+                                      <Trash2 className="h-3 w-3" />
+                                    </Button>
+                                  </Badge>
+                                ))}
+                              {driverStreamMappings?.filter(mapping => mapping.driver.id === driver.id).length === 0 && (
+                                <span className="text-xs text-gray-500">No connected streams</span>
+                              )}
+                            </div>
+                          </div>
                         </CardContent>
                       </Card>
                     ))}
@@ -691,6 +729,101 @@ const Revenue = () => {
               </Button>
               <Button type="submit" disabled={addRevenueDriverMutation.isPending}>
                 {addRevenueDriverMutation.isPending ? "Adding..." : "Add Driver"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Connect Driver to Stream Dialog */}
+      <Dialog open={isMappingDialogOpen} onOpenChange={setIsMappingDialogOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Connect Revenue Driver to Stream</DialogTitle>
+            <DialogDescription>
+              Link a revenue driver to a revenue stream to create a relationship.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleAddMapping}>
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="driver" className="text-right">
+                  Driver
+                </Label>
+                <div className="col-span-3">
+                  <Select 
+                    value={selectedDriverId} 
+                    onValueChange={(value) => setSelectedDriverId(Number(value))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select driver" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {revenueDrivers?.map(driver => (
+                        <SelectItem key={driver.id} value={driver.id.toString()}>
+                          {driver.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="stream" className="text-right">
+                  Stream
+                </Label>
+                <div className="col-span-3">
+                  <Select 
+                    value={selectedStreamId} 
+                    onValueChange={(value) => setSelectedStreamId(Number(value))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select stream" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {revenueStreams?.map(stream => (
+                        <SelectItem key={stream.id} value={stream.id.toString()}>
+                          {stream.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="formula" className="text-right">
+                  Formula
+                </Label>
+                <Input 
+                  id="formula" 
+                  name="formula" 
+                  className="col-span-3" 
+                  placeholder="e.g., value * 0.1"
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="multiplier" className="text-right">
+                  Multiplier
+                </Label>
+                <Input 
+                  id="multiplier" 
+                  name="multiplier" 
+                  type="number"
+                  step="0.01"
+                  className="col-span-3" 
+                  placeholder="e.g., 0.1" 
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setIsMappingDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button 
+                type="submit" 
+                disabled={addDriverStreamMappingMutation.isPending || !selectedDriverId || !selectedStreamId}
+              >
+                {addDriverStreamMappingMutation.isPending ? "Connecting..." : "Connect"}
               </Button>
             </DialogFooter>
           </form>
