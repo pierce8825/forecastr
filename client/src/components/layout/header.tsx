@@ -38,16 +38,19 @@ export const Header: React.FC<HeaderProps> = ({ user }) => {
             <div className="text-primary font-semibold text-xl mr-8">FinanceForward</div>
             <nav className="hidden md:flex space-x-6">
               {navItems.map((item) => (
-                <Link key={item.path} href={item.path}>
-                  <a className={cn(
-                    "px-2 py-4 font-medium",
-                    location === item.path
-                      ? "text-primary font-medium tab-active"
-                      : "text-neutral-dark hover:text-primary"
-                  )}>
+                <div key={item.path}>
+                  <Link 
+                    href={item.path} 
+                    className={cn(
+                      "px-2 py-4 font-medium",
+                      location === item.path
+                        ? "text-primary font-medium tab-active"
+                        : "text-neutral-dark hover:text-primary"
+                    )}
+                  >
                     {item.name}
-                  </a>
-                </Link>
+                  </Link>
+                </div>
               ))}
             </nav>
           </div>

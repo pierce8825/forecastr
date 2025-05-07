@@ -30,9 +30,9 @@ export function useQuickbooks(userId: number, config?: QuickbooksConfig) {
         }
         if (!res.ok) throw new Error("Failed to fetch QuickBooks integration");
         return res.json();
-      } catch (error) {
+      } catch (error: unknown) {
         // If 404, just return null (not connected yet)
-        if (error.message.includes("404")) {
+        if (error instanceof Error && error.message.includes("404")) {
           return null;
         }
         throw error;
@@ -66,10 +66,11 @@ export function useQuickbooks(userId: number, config?: QuickbooksConfig) {
         description: "QuickBooks integration connected successfully",
       });
     },
-    onError: (error) => {
+    onError: (error: unknown) => {
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
       toast({
         title: "Error",
-        description: `Failed to connect QuickBooks: ${error.message}`,
+        description: `Failed to connect QuickBooks: ${errorMessage}`,
         variant: "destructive",
       });
     },
@@ -87,10 +88,11 @@ export function useQuickbooks(userId: number, config?: QuickbooksConfig) {
         description: "QuickBooks integration disconnected successfully",
       });
     },
-    onError: (error) => {
+    onError: (error: unknown) => {
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
       toast({
         title: "Error",
-        description: `Failed to disconnect QuickBooks: ${error.message}`,
+        description: `Failed to disconnect QuickBooks: ${errorMessage}`,
         variant: "destructive",
       });
     },
