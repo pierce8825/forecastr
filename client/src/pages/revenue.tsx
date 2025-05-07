@@ -13,6 +13,9 @@ import { apiRequest } from "@/lib/queryClient";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import FormulaBuilder from "@/components/modals/formula-builder";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { format } from "date-fns";
 import { 
   LineChart, 
   Line, 
@@ -214,6 +217,14 @@ const Revenue = () => {
   const [formulaValue, setFormulaValue] = useState<string>('');
   const [calculatedAmount, setCalculatedAmount] = useState<number | null>(null);
   
+  // State for start and end dates (for revenue streams)
+  const [startDate, setStartDate] = useState<Date | undefined>(undefined);
+  const [endDate, setEndDate] = useState<Date | undefined>(undefined);
+  
+  // State for start and end dates (for revenue drivers)
+  const [driverStartDate, setDriverStartDate] = useState<Date | undefined>(undefined);
+  const [driverEndDate, setDriverEndDate] = useState<Date | undefined>(undefined);
+  
   // Fetch expenses for formula builder
   const { data: expenses } = useQuery({
     queryKey: ["/api/expenses", { forecastId }],
@@ -252,6 +263,9 @@ const Revenue = () => {
       frequency: type === "one-time" ? null : formData.get("frequency"),
       growthRate: formData.get("growthRate"),
       category: formData.get("category"),
+      // Add start and end dates if they exist
+      startDate: startDate ? startDate.toISOString() : null,
+      endDate: endDate ? endDate.toISOString() : null,
     };
     
     // Add formula if using formula calculation
@@ -264,6 +278,10 @@ const Revenue = () => {
     }
     
     addRevenueStreamMutation.mutate(streamData);
+    
+    // Reset the date states after submitting
+    setStartDate(undefined);
+    setEndDate(undefined);
   };
   
   // Formula builder handlers
@@ -292,6 +310,9 @@ const Revenue = () => {
       maxValue: formData.get("maxValue"),
       growthRate: formData.get("growthRate"),
       category: formData.get("category"),
+      // Add start and end dates if they exist
+      startDate: driverStartDate ? driverStartDate.toISOString() : null,
+      endDate: driverEndDate ? driverEndDate.toISOString() : null,
     });
     
     // Then create mappings for all selected streams
@@ -306,6 +327,9 @@ const Revenue = () => {
       }
     }
     
+    // Reset date states after submitting
+    setDriverStartDate(undefined);
+    setDriverEndDate(undefined);
     setIsAddDriverDialogOpen(false);
   };
   
@@ -410,6 +434,7 @@ const Revenue = () => {
                           <th className="py-3 px-2 text-right">Amount</th>
                           <th className="py-3 px-2 text-right">Frequency</th>
                           <th className="py-3 px-2 text-right">Growth Rate</th>
+                          <th className="py-3 px-2 text-center">Date Range</th>
                           <th className="py-3 px-2 text-right">Actions</th>
                         </tr>
                       </thead>
@@ -422,6 +447,16 @@ const Revenue = () => {
                             <td className="py-3 px-2 text-right">{stream.frequency}</td>
                             <td className="py-3 px-2 text-right">
                               {Number(stream.growthRate) * 100}%
+                            </td>
+                            <td className="py-3 px-2 text-center">
+                              <div className="text-xs">
+                                {stream.startDate ? (
+                                  <span>
+                                    {new Date(stream.startDate).toLocaleDateString()}
+                                    {stream.endDate ? ` - ${new Date(stream.endDate).toLocaleDateString()}` : ' - Ongoing'}
+                                  </span>
+                                ) : 'No date range'}
+                              </div>
                             </td>
                             <td className="py-3 px-2 text-right">
                               <div className="flex justify-end gap-2">
@@ -525,12 +560,20 @@ const Revenue = () => {
                                 <Edit2 className="h-3 w-3" />
                               </Button>
                             </div>
-                            <div className="flex items-center">
+                            <div className="flex flex-col items-end">
                               <span className="text-sm font-medium text-gray-900">
                                 {Number(driver.value).toLocaleString()} {driver.unit}
+                                <span className="ml-2 text-xs font-medium text-green-600">
+                                  ↑ {Number(driver.growthRate) * 100}%
+                                </span>
                               </span>
-                              <span className="ml-2 text-xs font-medium text-green-600">
-                                ↑ {Number(driver.growthRate) * 100}%
+                              <span className="text-xs text-gray-500">
+                                {driver.startDate ? (
+                                  <>
+                                    {new Date(driver.startDate).toLocaleDateString()}
+                                    {driver.endDate ? ` to ${new Date(driver.endDate).toLocaleDateString()}` : ' - Ongoing'}
+                                  </>
+                                ) : 'No date range'}
                               </span>
                             </div>
                           </div>
@@ -741,6 +784,61 @@ const Revenue = () => {
                 </Label>
                 <Input id="category" name="category" className="col-span-3" />
               </div>
+              
+              {/* Start Date Picker */}
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="startDate" className="text-right">
+                  Start Date
+                </Label>
+                <div className="col-span-3">
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant={"outline"}
+                        className={`w-full justify-start text-left font-normal ${!startDate && "text-muted-foreground"}`}
+                      >
+                        {startDate ? format(startDate, "PPP") : "Select start date"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={startDate}
+                        onSelect={setStartDate}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+              </div>
+              
+              {/* End Date Picker */}
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="endDate" className="text-right">
+                  End Date
+                </Label>
+                <div className="col-span-3">
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant={"outline"}
+                        className={`w-full justify-start text-left font-normal ${!endDate && "text-muted-foreground"}`}
+                      >
+                        {endDate ? format(endDate, "PPP") : "Select end date (optional)"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={endDate}
+                        onSelect={setEndDate}
+                        initialFocus
+                        disabled={(date) => startDate ? date < startDate : false}
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+              </div>
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setIsAddStreamDialogOpen(false)}>
@@ -846,6 +944,61 @@ const Revenue = () => {
                     <SelectItem value="other">Other</SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
+              
+              {/* Start Date Picker */}
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="startDate" className="text-right">
+                  Start Date
+                </Label>
+                <div className="col-span-3">
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant={"outline"}
+                        className={`w-full justify-start text-left font-normal ${!driverStartDate && "text-muted-foreground"}`}
+                      >
+                        {driverStartDate ? format(driverStartDate, "PPP") : "Select start date"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={driverStartDate}
+                        onSelect={setDriverStartDate}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+              </div>
+              
+              {/* End Date Picker */}
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="endDate" className="text-right">
+                  End Date
+                </Label>
+                <div className="col-span-3">
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant={"outline"}
+                        className={`w-full justify-start text-left font-normal ${!driverEndDate && "text-muted-foreground"}`}
+                      >
+                        {driverEndDate ? format(driverEndDate, "PPP") : "Select end date (optional)"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={driverEndDate}
+                        onSelect={setDriverEndDate}
+                        initialFocus
+                        disabled={(date) => driverStartDate ? date < driverStartDate : false}
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
               </div>
               
               {/* Revenue Stream Selection */}
