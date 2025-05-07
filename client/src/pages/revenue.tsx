@@ -220,11 +220,13 @@ const Revenue = () => {
     });
   };
 
-  const handleAddRevenueDriver = (e) => {
+  const handleAddRevenueDriver = async (e) => {
     e.preventDefault();
     const formData = new FormData(e.target);
+    const selectedStreamIds = formData.getAll("streams");
     
-    addRevenueDriverMutation.mutate({
+    // First, create the revenue driver
+    const newDriver = await addRevenueDriverMutation.mutateAsync({
       forecastId,
       name: formData.get("name"),
       value: formData.get("value"),
@@ -234,6 +236,20 @@ const Revenue = () => {
       growthRate: formData.get("growthRate"),
       category: formData.get("category"),
     });
+    
+    // Then create mappings for all selected streams
+    if (newDriver && selectedStreamIds.length > 0) {
+      for (const streamId of selectedStreamIds) {
+        await addDriverStreamMappingMutation.mutateAsync({
+          driverId: newDriver.id,
+          streamId: Number(streamId),
+          formula: null,
+          multiplier: "1"
+        });
+      }
+    }
+    
+    setIsAddDriverDialogOpen(false);
   };
   
   const handleAddMapping = (e) => {
@@ -722,13 +738,52 @@ const Revenue = () => {
                   </SelectContent>
                 </Select>
               </div>
+              
+              {/* Revenue Stream Selection */}
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="streams" className="text-right">
+                  Revenue Streams
+                </Label>
+                <div className="col-span-3">
+                  <div className="border rounded-md p-3">
+                    <div className="text-sm mb-2 text-muted-foreground">
+                      Select revenue streams to connect to this driver:
+                    </div>
+                    {isLoadingStreams ? (
+                      <div className="text-sm text-center py-2">Loading streams...</div>
+                    ) : revenueStreams && revenueStreams.length > 0 ? (
+                      <div className="space-y-2">
+                        {revenueStreams.map(stream => (
+                          <div key={stream.id} className="flex items-center space-x-2">
+                            <input 
+                              type="checkbox" 
+                              id={`stream-${stream.id}`}
+                              name="streams" 
+                              value={stream.id} 
+                              className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                            />
+                            <label htmlFor={`stream-${stream.id}`} className="text-sm font-medium text-gray-700">
+                              {stream.name} - ${Number(stream.amount).toLocaleString()} ({stream.type})
+                            </label>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-sm text-center py-2">No revenue streams available. Create streams first.</div>
+                    )}
+                  </div>
+                </div>
+              </div>
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setIsAddDriverDialogOpen(false)}>
                 Cancel
               </Button>
-              <Button type="submit" disabled={addRevenueDriverMutation.isPending}>
-                {addRevenueDriverMutation.isPending ? "Adding..." : "Add Driver"}
+              <Button 
+                type="submit" 
+                disabled={addRevenueDriverMutation.isPending || addDriverStreamMappingMutation.isPending}
+              >
+                {addRevenueDriverMutation.isPending || addDriverStreamMappingMutation.isPending ? "Processing..." : "Add Driver"}
               </Button>
             </DialogFooter>
           </form>
