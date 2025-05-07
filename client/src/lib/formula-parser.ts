@@ -9,10 +9,64 @@ export interface FormulaEntity {
 
 export interface FormulaError {
   message: string;
-  type: 'syntax' | 'circular' | 'reference' | 'calculation';
+  type: 'syntax' | 'circular' | 'reference' | 'calculation' | 'domain';
   details?: string;
   position?: number;
+  suggestion?: string; // Suggested fix for the error
 }
+
+// Available financial and statistical functions with descriptions
+export const availableFunctions = {
+  // Basic operations
+  add: { description: 'Addition: add(a, b, ...)', example: 'add(10, 20)' },
+  subtract: { description: 'Subtraction: subtract(a, b)', example: 'subtract(20, 10)' },
+  multiply: { description: 'Multiplication: multiply(a, b, ...)', example: 'multiply(5, 4)' },
+  divide: { description: 'Division: divide(a, b)', example: 'divide(20, 4)' },
+  
+  // Financial functions
+  pmt: { description: 'Calculate the payment for a loan: pmt(rate, nper, pv)', example: 'pmt(0.05/12, 60, 10000)' },
+  fv: { description: 'Future value: fv(rate, nper, pmt, [pv])', example: 'fv(0.05/12, 60, -200, 10000)' },
+  pv: { description: 'Present value: pv(rate, nper, pmt, [fv])', example: 'pv(0.05/12, 60, -200)' },
+  npv: { description: 'Net present value: npv(rate, values)', example: 'npv(0.1, [100, 200, 300])' },
+  irr: { description: 'Internal rate of return: irr(values)', example: 'irr([-100, 50, 70])' },
+  
+  // Statistical functions
+  mean: { description: 'Mean/average of values: mean(a, b, ...)', example: 'mean(10, 20, 30, 40)' },
+  median: { description: 'Median of values: median(a, b, ...)', example: 'median(10, 20, 30, 40)' },
+  std: { description: 'Standard deviation: std(a, b, ...)', example: 'std(10, 20, 30, 40)' },
+  min: { description: 'Minimum value: min(a, b, ...)', example: 'min(10, 20, 5, 40)' },
+  max: { description: 'Maximum value: max(a, b, ...)', example: 'max(10, 20, 30, 40)' },
+  
+  // Mathematical functions
+  pow: { description: 'Power: pow(base, exponent)', example: 'pow(2, 3)' },
+  sqrt: { description: 'Square root: sqrt(value)', example: 'sqrt(16)' },
+  log: { description: 'Natural logarithm: log(value)', example: 'log(10)' },
+  log10: { description: 'Base-10 logarithm: log10(value)', example: 'log10(100)' },
+  exp: { description: 'Exponential: exp(value)', example: 'exp(2)' },
+  abs: { description: 'Absolute value: abs(value)', example: 'abs(-5)' },
+  
+  // Rounding functions
+  round: { description: 'Round to nearest integer: round(value)', example: 'round(3.7)' },
+  ceil: { description: 'Round up: ceil(value)', example: 'ceil(3.2)' },
+  floor: { description: 'Round down: floor(value)', example: 'floor(3.8)' },
+  
+  // Trigonometric functions
+  sin: { description: 'Sine: sin(value)', example: 'sin(0.5)' },
+  cos: { description: 'Cosine: cos(value)', example: 'cos(0.5)' },
+  tan: { description: 'Tangent: tan(value)', example: 'tan(0.5)' },
+  
+  // Business-specific functions
+  cagr: { description: 'Compound Annual Growth Rate: cagr(beginValue, endValue, years)', example: 'cagr(100, 200, 5)' },
+  markup: { description: 'Markup percentage: markup(cost, price)', example: 'markup(80, 100)' },
+  margin: { description: 'Profit margin: margin(revenue, cost)', example: 'margin(100, 70)' },
+  annualToMonthly: { description: 'Convert annual rate to monthly: annualToMonthly(annualRate)', example: 'annualToMonthly(0.12)' },
+  depreciation: { description: 'Calculate depreciation: depreciation(cost, salvageValue, lifeYears)', example: 'depreciation(10000, 1000, 5)' },
+  compound: { description: 'Compound interest: compound(principal, rate, times, years)', example: 'compound(1000, 0.05, 12, 5)' },
+  roi: { description: 'Return on Investment: roi(gain, cost)', example: 'roi(1200, 1000)' },
+  breakEven: { description: 'Break-even point: breakEven(fixedCosts, unitPrice, unitVariableCost)', example: 'breakEven(10000, 100, 60)' },
+  ltv: { description: 'Customer Lifetime Value: ltv(avgMonthlyRevenue, grossMargin, churnRate)', example: 'ltv(100, 0.7, 0.05)' },
+  roundTo: { description: 'Round to decimal places: roundTo(value, decimals)', example: 'roundTo(123.456, 2)' }
+};
 
 export class FormulaParser {
   private variables: Record<string, number> = {};
@@ -245,16 +299,128 @@ export class FormulaParser {
    */
   evaluate(formula: string): number {
     try {
+      // First run validation
       const validation = this.validateWithDetails(formula);
       if (!validation.isValid) {
         throw new Error(validation.error?.message || 'Invalid formula');
       }
       
+      // Register custom business-specific functions
+      const customFunctions = this.registerCustomFunctions();
+      
+      // Replace variables and evaluate
       const formulaWithValues = this.replaceVariablesWithValues(formula, this.variables);
-      return math.evaluate(formulaWithValues);
+      
+      // Run the evaluation with custom scope that includes our functions
+      const result = math.evaluate(formulaWithValues, customFunctions);
+      
+      // Check if result is a valid number
+      if (typeof result !== 'number' || isNaN(result) || !isFinite(result)) {
+        throw new Error('Formula did not evaluate to a valid number');
+      }
+      
+      return result;
     } catch (error) {
-      throw new Error(`Error evaluating formula: ${error.message}`);
+      // Provide more descriptive error messages based on error type
+      if (error.message.includes('undefined variable')) {
+        const varName = error.message.match(/undefined variable (\w+)/)?.[1];
+        throw new Error(`Undefined variable: ${varName}. Make sure all variables are defined.`);
+      } else if (error.message.includes('unexpected end of expression')) {
+        throw new Error('Unexpected end of expression. Check for incomplete formulas or missing closing parentheses.');
+      } else if (error.message.includes('value must be a number')) {
+        throw new Error('Invalid value in calculation. All operands must be numeric.');
+      } else if (error.message.includes('division by zero')) {
+        throw new Error('Division by zero is not allowed.');
+      } else if (error.message.includes('function') && error.message.includes('not found')) {
+        const funcName = error.message.match(/function '?(\w+)'? not found/)?.[1];
+        const similarFunctions = Object.keys(availableFunctions)
+          .filter(f => f.includes(funcName || '') || funcName?.includes(f))
+          .slice(0, 3);
+        
+        const suggestion = similarFunctions.length > 0 
+          ? `Did you mean: ${similarFunctions.join(', ')}?` 
+          : 'Check function names and spelling.';
+          
+        throw new Error(`Unknown function: ${funcName}. ${suggestion}`);
+      } else {
+        throw new Error(`Error evaluating formula: ${error.message}`);
+      }
     }
+  }
+  
+  /**
+   * Register custom business and financial functions
+   * @returns Object with custom function definitions
+   */
+  private registerCustomFunctions(): Record<string, Function> {
+    return {
+      // CAGR (Compound Annual Growth Rate)
+      cagr: function(beginValue: number, endValue: number, years: number): number {
+        if (beginValue <= 0 || years <= 0) {
+          throw new Error('CAGR calculation requires positive begin value and years');
+        }
+        return Math.pow(endValue / beginValue, 1 / years) - 1;
+      },
+      
+      // Calculate markup percentage
+      markup: function(cost: number, price: number): number {
+        if (cost <= 0) {
+          throw new Error('Markup calculation requires positive cost');
+        }
+        return (price - cost) / cost;
+      },
+      
+      // Calculate profit margin
+      margin: function(revenue: number, cost: number): number {
+        if (revenue <= 0) {
+          throw new Error('Margin calculation requires positive revenue');
+        }
+        return (revenue - cost) / revenue;
+      },
+      
+      // Convert annual to monthly rate
+      annualToMonthly: function(annualRate: number): number {
+        return Math.pow(1 + annualRate, 1/12) - 1;
+      },
+      
+      // Calculate depreciation
+      depreciation: function(cost: number, salvageValue: number, lifeYears: number): number {
+        return (cost - salvageValue) / lifeYears;
+      },
+      
+      // Calculate compound interest
+      compound: function(principal: number, rate: number, times: number, years: number): number {
+        return principal * Math.pow(1 + rate/times, times * years);
+      },
+      
+      // Calculate Return on Investment (ROI)
+      roi: function(gain: number, cost: number): number {
+        if (cost === 0) throw new Error('ROI calculation requires non-zero cost');
+        return gain / cost;
+      },
+      
+      // Calculate break-even point
+      breakEven: function(fixedCosts: number, unitPrice: number, unitVariableCost: number): number {
+        if (unitPrice <= unitVariableCost) {
+          throw new Error('Break-even calculation requires price greater than variable cost');
+        }
+        return fixedCosts / (unitPrice - unitVariableCost);
+      },
+      
+      // Calculate Lifetime Value (LTV)
+      ltv: function(avgMonthlyRevenue: number, grossMargin: number, churnRate: number): number {
+        if (churnRate <= 0 || churnRate >= 1) {
+          throw new Error('Churn rate must be between 0 and 1');
+        }
+        return (avgMonthlyRevenue * grossMargin) / churnRate;
+      },
+      
+      // Round to specific number of decimal places
+      roundTo: function(value: number, decimals: number): number {
+        const factor = Math.pow(10, decimals);
+        return Math.round(value * factor) / factor;
+      }
+    };
   }
   
   /**
@@ -288,8 +454,15 @@ export class FormulaParser {
     // This is a simplified approach that looks for words in the formula
     // A more robust approach would parse the formula properly
     const variableRegex = /[A-Za-z][A-Za-z0-9_\s]*/g;
+    // Include all math.js functions and our custom business functions
     const mathJsKeywords = new Set([
-      'sin', 'cos', 'tan', 'asin', 'acos', 'atan', 'sqrt', 'log', 'exp', 'pow', 'abs'
+      // Basic math.js functions
+      'sin', 'cos', 'tan', 'asin', 'acos', 'atan', 'sqrt', 'log', 'log10', 'exp', 'pow', 'abs',
+      'round', 'floor', 'ceil', 'min', 'max', 'mean', 'median', 'std', 'sum',
+      // Financial and business functions
+      'pmt', 'fv', 'pv', 'npv', 'irr', 'cagr', 'markup', 'margin',
+      // Custom functions
+      'annualToMonthly', 'depreciation', 'compound', 'roi', 'breakEven', 'ltv', 'roundTo'
     ]);
     
     const matches = formula.match(variableRegex) || [];
