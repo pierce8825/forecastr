@@ -158,27 +158,48 @@ const Expenses = () => {
     try {
       // Get personnel count if linking to personnel
       let variables = {};
-      const linkedId = document.querySelector(
-        linkType === 'stream' ? 'select[name="linkedStreamId"]' : 
-        linkType === 'driver' ? 'select[name="linkedDriverId"]' : 
-        linkType === 'personnel' ? 'select[name="linkedPersonnelId"]' : null
-      )?.value;
       
-      if (linkType === 'personnel' && linkedId) {
-        const personnel = personnelRoles?.find(p => p.id.toString() === linkedId);
+      // Use a safer method to get selected value
+      const getSelectedValue = () => {
+        if (linkType === 'stream' && revenueStreams?.length > 0) {
+          const select = document.querySelector('select[name="linkedStreamId"]');
+          return select?.value || null;
+        } else if (linkType === 'driver' && revenueDrivers?.length > 0) {
+          const select = document.querySelector('select[name="linkedDriverId"]');
+          return select?.value || null;
+        } else if (linkType === 'personnel' && personnelRoles?.length > 0) {
+          const select = document.querySelector('select[name="linkedPersonnelId"]');
+          return select?.value || null;
+        }
+        return null;
+      };
+      
+      const linkedId = getSelectedValue();
+      
+      if (linkType === 'personnel' && linkedId && personnelRoles?.length > 0) {
+        const personnel = personnelRoles.find(p => p.id.toString() === linkedId);
         if (personnel) {
-          variables.headcount = personnel.count;
-          variables.salary = Number(personnel.annualSalary);
+          variables = {
+            ...variables,
+            headcount: Number(personnel.count) || 0,
+            salary: Number(personnel.annualSalary) || 0
+          };
         }
-      } else if (linkType === 'driver' && linkedId) {
-        const driver = revenueDrivers?.find(d => d.id.toString() === linkedId);
+      } else if (linkType === 'driver' && linkedId && revenueDrivers?.length > 0) {
+        const driver = revenueDrivers.find(d => d.id.toString() === linkedId);
         if (driver) {
-          variables.value = Number(driver.value);
+          variables = {
+            ...variables,
+            value: Number(driver.value) || 0
+          };
         }
-      } else if (linkType === 'stream' && linkedId) {
-        const stream = revenueStreams?.find(s => s.id.toString() === linkedId);
+      } else if (linkType === 'stream' && linkedId && revenueStreams?.length > 0) {
+        const stream = revenueStreams.find(s => s.id.toString() === linkedId);
         if (stream) {
-          variables.amount = Number(stream.amount);
+          variables = {
+            ...variables,
+            amount: Number(stream.amount) || 0
+          };
         }
       }
       
@@ -193,6 +214,7 @@ const Expenses = () => {
         setFormulaPreview('Invalid formula');
       }
     } catch (error) {
+      console.error("Formula calculation error:", error);
       setFormulaPreview('Error calculating');
     }
   };
@@ -202,33 +224,58 @@ const Expenses = () => {
     e.preventDefault();
     const formData = new FormData(e.target);
     
-    // Prepare expense data
-    const expenseData = {
+    // Initialize expense data with all possible fields
+    // This prevents TypeScript errors with property access
+    const expenseData: any = {
       forecastId,
       name: formData.get("name"),
       frequency: formData.get("frequency"),
       category: formData.get("category"),
       isCogsRelated: formData.get("isCogsRelated") === "on",
+      amount: 0,
+      formula: null,
+      linkedStreamId: null,
+      linkedDriverId: null,
+      linkedPersonnelId: null
     };
     
     // Handle formula and amount
     if (useFormula) {
       expenseData.formula = formData.get("formula");
-      expenseData.amount = formulaPreview || 0; // Use previewed amount or default to 0
+      expenseData.amount = formulaPreview ? Number(formulaPreview) : 0; // Use previewed amount or default to 0
     } else {
-      expenseData.amount = formData.get("amount");
+      expenseData.amount = Number(formData.get("amount"));
     }
     
     // Add linked items based on selection
-    if (linkType === "stream") {
-      expenseData.linkedStreamId = Number(formData.get("linkedStreamId"));
-    } else if (linkType === "driver") {
-      expenseData.linkedDriverId = Number(formData.get("linkedDriverId"));
-    } else if (linkType === "personnel") {
-      expenseData.linkedPersonnelId = Number(formData.get("linkedPersonnelId"));
+    if (linkType === "stream" && formData.get("linkedStreamId")) {
+      // Only set if a valid value was selected
+      const streamId = formData.get("linkedStreamId");
+      if (streamId && streamId !== "none" && streamId !== "placeholder") {
+        expenseData.linkedStreamId = Number(streamId);
+      }
+    } else if (linkType === "driver" && formData.get("linkedDriverId")) {
+      // Only set if a valid value was selected
+      const driverId = formData.get("linkedDriverId");
+      if (driverId && driverId !== "none" && driverId !== "placeholder") {
+        expenseData.linkedDriverId = Number(driverId);
+      }
+    } else if (linkType === "personnel" && formData.get("linkedPersonnelId")) {
+      // Only set if a valid value was selected
+      const personnelId = formData.get("linkedPersonnelId");
+      if (personnelId && personnelId !== "none" && personnelId !== "placeholder") {
+        expenseData.linkedPersonnelId = Number(personnelId);
+      }
     }
     
+    // Submit the data
+    console.log("Submitting expense:", expenseData);
     addExpenseMutation.mutate(expenseData);
+    
+    // Reset form state 
+    setLinkType("none");
+    setUseFormula(false);
+    setFormulaPreview(null);
   };
 
   // Filter expenses by category
@@ -636,13 +683,13 @@ const Expenses = () => {
                   <Label htmlFor="linkedStreamId" className="text-right">
                     Stream
                   </Label>
-                  <Select name="linkedStreamId">
+                  <Select name="linkedStreamId" defaultValue={revenueStreams?.length > 0 ? revenueStreams[0].id.toString() : ""}>
                     <SelectTrigger className="col-span-3">
                       <SelectValue placeholder="Select revenue stream" />
                     </SelectTrigger>
                     <SelectContent>
                       {isLoadingStreams ? (
-                        <SelectItem value="" disabled>Loading streams...</SelectItem>
+                        <SelectItem value="placeholder" disabled>Loading streams...</SelectItem>
                       ) : revenueStreams?.length > 0 ? (
                         revenueStreams.map(stream => (
                           <SelectItem key={stream.id} value={stream.id.toString()}>
@@ -650,7 +697,7 @@ const Expenses = () => {
                           </SelectItem>
                         ))
                       ) : (
-                        <SelectItem value="" disabled>No streams available</SelectItem>
+                        <SelectItem value="none" disabled>No streams available</SelectItem>
                       )}
                     </SelectContent>
                   </Select>
@@ -662,13 +709,13 @@ const Expenses = () => {
                   <Label htmlFor="linkedDriverId" className="text-right">
                     Driver
                   </Label>
-                  <Select name="linkedDriverId">
+                  <Select name="linkedDriverId" defaultValue={revenueDrivers?.length > 0 ? revenueDrivers[0].id.toString() : ""}>
                     <SelectTrigger className="col-span-3">
                       <SelectValue placeholder="Select revenue driver" />
                     </SelectTrigger>
                     <SelectContent>
                       {isLoadingDrivers ? (
-                        <SelectItem value="" disabled>Loading drivers...</SelectItem>
+                        <SelectItem value="placeholder" disabled>Loading drivers...</SelectItem>
                       ) : revenueDrivers?.length > 0 ? (
                         revenueDrivers.map(driver => (
                           <SelectItem key={driver.id} value={driver.id.toString()}>
@@ -676,7 +723,7 @@ const Expenses = () => {
                           </SelectItem>
                         ))
                       ) : (
-                        <SelectItem value="" disabled>No drivers available</SelectItem>
+                        <SelectItem value="none" disabled>No drivers available</SelectItem>
                       )}
                     </SelectContent>
                   </Select>
@@ -688,13 +735,13 @@ const Expenses = () => {
                   <Label htmlFor="linkedPersonnelId" className="text-right">
                     Personnel
                   </Label>
-                  <Select name="linkedPersonnelId">
+                  <Select name="linkedPersonnelId" defaultValue={personnelRoles?.length > 0 ? personnelRoles[0].id.toString() : ""}>
                     <SelectTrigger className="col-span-3">
                       <SelectValue placeholder="Select personnel role" />
                     </SelectTrigger>
                     <SelectContent>
                       {isLoadingPersonnel ? (
-                        <SelectItem value="" disabled>Loading personnel...</SelectItem>
+                        <SelectItem value="placeholder" disabled>Loading personnel...</SelectItem>
                       ) : personnelRoles?.length > 0 ? (
                         personnelRoles.map(role => (
                           <SelectItem key={role.id} value={role.id.toString()}>
@@ -702,7 +749,7 @@ const Expenses = () => {
                           </SelectItem>
                         ))
                       ) : (
-                        <SelectItem value="" disabled>No personnel roles available</SelectItem>
+                        <SelectItem value="none" disabled>No personnel roles available</SelectItem>
                       )}
                     </SelectContent>
                   </Select>
