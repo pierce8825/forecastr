@@ -1,25 +1,20 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useToast } from "@/hooks/use-toast";
-import { Header, ToolbarHeader } from "@/components/layout/header";
-import { Sidebar } from "@/components/layout/sidebar";
-import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { MaterialIcon } from "@/components/ui/ui-icons";
-import { Badge } from "@/components/ui/badge";
 import { 
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+  Card, 
+  CardHeader, 
+  CardTitle, 
+  CardDescription, 
+  CardContent 
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  BarChart,
-  Bar,
   LineChart,
   Line,
+  BarChart,
+  Bar,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -28,387 +23,955 @@ import {
   ResponsiveContainer,
   PieChart,
   Pie,
-  Cell
+  Cell,
+  RadarChart,
+  PolarGrid,
+  PolarAngleAxis,
+  PolarRadiusAxis,
+  Radar
 } from "recharts";
-import { useFinancialContext } from "@/contexts/financial-context";
+import { 
+  Download, 
+  Share2, 
+  FileText,
+  Calendar,
+  Settings,
+  PieChart as PieChartIcon,
+  BarChart as BarChartIcon,
+  LineChart as LineChartIcon,
+  ClipboardList
+} from "lucide-react";
+import { Helmet } from "react-helmet";
+import FormulaBuilder from "@/components/modals/formula-builder";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
-const Reports: React.FC = () => {
-  const { toast } = useToast();
-  const { activeWorkspace, scenarios, setActiveScenario, activePeriod, setActivePeriod } = useFinancialContext();
+const COLORS = ['#3B82F6', '#10B981', '#8B5CF6', '#F59E0B', '#EF4444'];
 
-  // Current user
-  const [user] = useState({
-    id: 1,
-    fullName: "John Smith",
-    initials: "JS"
+const Reports = () => {
+  const [activeTab, setActiveTab] = useState("financial");
+  const [reportPeriod, setReportPeriod] = useState("12");
+  const [isFormulaBuilderOpen, setIsFormulaBuilderOpen] = useState(false);
+  
+  // Demo user ID for MVP
+  const userId = 1;
+  
+  // Get the active forecast
+  const { data: forecasts } = useQuery({
+    queryKey: ["/api/forecasts", { userId }],
+    queryFn: async () => {
+      const res = await fetch(`/api/forecasts?userId=${userId}`);
+      if (!res.ok) throw new Error("Failed to fetch forecasts");
+      return res.json();
+    },
   });
 
-  // Fetch reports data
-  const { data: reportsData, isLoading: isLoadingReports } = useQuery({
-    queryKey: ['/api/workspaces/1/reports'],
-    enabled: !!activeWorkspace
+  const activeForecast = forecasts?.[0];
+  const forecastId = activeForecast?.id;
+
+  // Fetch financial projections
+  const { data: projections, isLoading: isLoadingProjections } = useQuery({
+    queryKey: ["/api/financial-projections", { forecastId }],
+    queryFn: async () => {
+      if (!forecastId) throw new Error("No forecast selected");
+      const res = await fetch(`/api/financial-projections?forecastId=${forecastId}`);
+      if (!res.ok) throw new Error("Failed to fetch financial projections");
+      return res.json();
+    },
+    enabled: !!forecastId,
   });
-  
-  // Mock data for demonstration - in a real app, this would come from the API
-  const revenueData = [
-    { month: "Jan", value: 25200 },
-    { month: "Feb", value: 27300 },
-    { month: "Mar", value: 28900 },
-    { month: "Apr", value: 30100 },
-    { month: "May", value: 32500 },
-    { month: "Jun", value: 35000 },
-    { month: "Jul", value: 37000 },
-    { month: "Aug", value: 39000 },
-    { month: "Sep", value: 41000 },
-    { month: "Oct", value: 43000 },
-    { month: "Nov", value: 45000 },
-    { month: "Dec", value: 47000 }
-  ];
-  
-  const revenueByStream = [
-    { name: "Basic Subscription", value: 144000 },
-    { name: "Premium Tier", value: 107900 },
-    { name: "Enterprise Plans", value: 85000 },
-    { name: "One-time Services", value: 19700 }
-  ];
-  
-  const expensesByCategory = [
-    { name: "Personnel", value: 156000 },
-    { name: "Marketing", value: 72300 },
-    { name: "Software & Tools", value: 19600 },
-    { name: "Office & Operations", value: 27000 }
-  ];
-  
-  const metricsTable = [
-    { metric: "Monthly Recurring Revenue (MRR)", value: "$78,500", change: "+12.4%", changeType: "positive" },
-    { metric: "Annual Recurring Revenue (ARR)", value: "$942,000", change: "+12.4%", changeType: "positive" },
-    { metric: "Customer Acquisition Cost (CAC)", value: "$124.50", change: "+8.2%", changeType: "negative" },
-    { metric: "Lifetime Value (LTV)", value: "$2,780", change: "+5.3%", changeType: "positive" },
-    { metric: "LTV:CAC Ratio", value: "22.3x", change: "-2.7%", changeType: "negative" },
-    { metric: "Cash Runway", value: "14.2 months", change: "+2.3", changeType: "positive" },
-    { metric: "Gross Margin", value: "68.5%", change: "+1.2%", changeType: "positive" },
-    { metric: "Burn Rate", value: "$42,000", change: "+8.5%", changeType: "negative" }
-  ];
-  
-  const cashFlowTable = [
-    { month: "Jan 2023", revenue: 78500, expenses: 58000, cashFlow: 20500, balance: 620000 },
-    { month: "Feb 2023", revenue: 83200, expenses: 58500, cashFlow: 24700, balance: 644700 },
-    { month: "Mar 2023", revenue: 88500, expenses: 59000, cashFlow: 29500, balance: 674200 },
-    { month: "Apr 2023", revenue: 94100, expenses: 59750, cashFlow: 34350, balance: 708550 },
-    { month: "May 2023", revenue: 100200, expenses: 60500, cashFlow: 39700, balance: 748250 },
-    { month: "Jun 2023", revenue: 106700, expenses: 61250, cashFlow: 45450, balance: 793700 }
+
+  // Fetch custom formulas
+  const { data: formulas, isLoading: isLoadingFormulas } = useQuery({
+    queryKey: ["/api/custom-formulas", { forecastId }],
+    queryFn: async () => {
+      if (!forecastId) throw new Error("No forecast selected");
+      const res = await fetch(`/api/custom-formulas?forecastId=${forecastId}`);
+      if (!res.ok) throw new Error("Failed to fetch custom formulas");
+      return res.json();
+    },
+    enabled: !!forecastId,
+  });
+
+  // Fetch revenue streams
+  const { data: revenueStreams, isLoading: isLoadingRevenueStreams } = useQuery({
+    queryKey: ["/api/revenue-streams", { forecastId }],
+    queryFn: async () => {
+      if (!forecastId) throw new Error("No forecast selected");
+      const res = await fetch(`/api/revenue-streams?forecastId=${forecastId}`);
+      if (!res.ok) throw new Error("Failed to fetch revenue streams");
+      return res.json();
+    },
+    enabled: !!forecastId,
+  });
+
+  // Fetch expenses
+  const { data: expenses, isLoading: isLoadingExpenses } = useQuery({
+    queryKey: ["/api/expenses", { forecastId }],
+    queryFn: async () => {
+      if (!forecastId) throw new Error("No forecast selected");
+      const res = await fetch(`/api/expenses?forecastId=${forecastId}`);
+      if (!res.ok) throw new Error("Failed to fetch expenses");
+      return res.json();
+    },
+    enabled: !!forecastId,
+  });
+
+  // Fetch personnel roles
+  const { data: personnelRoles, isLoading: isLoadingRoles } = useQuery({
+    queryKey: ["/api/personnel-roles", { forecastId }],
+    queryFn: async () => {
+      if (!forecastId) throw new Error("No forecast selected");
+      const res = await fetch(`/api/personnel-roles?forecastId=${forecastId}`);
+      if (!res.ok) throw new Error("Failed to fetch personnel roles");
+      return res.json();
+    },
+    enabled: !!forecastId,
+  });
+
+  // Process data for financial reports
+  const financialData = projections?.map(projection => {
+    // Extract month and year from period (format: MM-YYYY)
+    const [month, year] = projection.period.split("-");
+    const date = new Date(parseInt(year), parseInt(month) - 1, 1);
+    const monthName = date.toLocaleString('default', { month: 'short' });
+    
+    return {
+      name: `${monthName} ${year}`,
+      revenue: Number(projection.revenueTotal),
+      cogs: Number(projection.cogsTotal),
+      grossProfit: Number(projection.revenueTotal) - Number(projection.cogsTotal),
+      expenses: Number(projection.expenseTotal),
+      personnel: Number(projection.personnelTotal),
+      netProfit: Number(projection.netProfit),
+      month: parseInt(month),
+      year: parseInt(year),
+      date
+    };
+  }) || [];
+
+  // Sort by date
+  financialData.sort((a, b) => a.date.getTime() - b.date.getTime());
+
+  // Process data for revenue report
+  const revenueByTypeData = [];
+  if (revenueStreams) {
+    const streamsByType = {};
+    
+    revenueStreams.forEach(stream => {
+      if (!streamsByType[stream.type]) {
+        streamsByType[stream.type] = {
+          name: stream.type.charAt(0).toUpperCase() + stream.type.slice(1),
+          value: 0
+        };
+      }
+      
+      streamsByType[stream.type].value += Number(stream.amount);
+    });
+    
+    revenueByTypeData.push(...Object.values(streamsByType));
+  }
+
+  // Process data for expense report
+  const expensesByCategoryData = [];
+  if (expenses) {
+    const expensesByCategory = {};
+    
+    expenses.forEach(expense => {
+      const category = expense.category || "Other";
+      
+      if (!expensesByCategory[category]) {
+        expensesByCategory[category] = {
+          name: category,
+          value: 0
+        };
+      }
+      
+      expensesByCategory[category].value += Number(expense.amount);
+    });
+    
+    expensesByCategoryData.push(...Object.values(expensesByCategory));
+  }
+
+  // Process data for personnel report
+  const personnelByDepartmentData = [];
+  if (personnelRoles) {
+    const departmentMap = {};
+    
+    personnelRoles.forEach(role => {
+      if (!departmentMap[role.departmentId]) {
+        // Fetch department name
+        const department = "Department " + role.departmentId; // Simplified for demo
+        
+        departmentMap[role.departmentId] = {
+          name: department,
+          headcount: 0,
+          cost: 0
+        };
+      }
+      
+      departmentMap[role.departmentId].headcount += role.count;
+      departmentMap[role.departmentId].cost += Number(role.annualSalary) * role.count * (1 + Number(role.benefits || 0));
+    });
+    
+    personnelByDepartmentData.push(...Object.values(departmentMap));
+  }
+
+  // Prepare data for KPI radar chart
+  const kpiData = [
+    {
+      subject: 'Revenue',
+      A: 120,
+      B: 110,
+      fullMark: 150,
+    },
+    {
+      subject: 'Gross Margin',
+      A: 98,
+      B: 130,
+      fullMark: 150,
+    },
+    {
+      subject: 'Customer Acq.',
+      A: 86,
+      B: 130,
+      fullMark: 150,
+    },
+    {
+      subject: 'Retention',
+      A: 99,
+      B: 100,
+      fullMark: 150,
+    },
+    {
+      subject: 'Burn Rate',
+      A: 85,
+      B: 90,
+      fullMark: 150,
+    },
+    {
+      subject: 'Runway',
+      A: 65,
+      B: 85,
+      fullMark: 150,
+    },
   ];
 
-  // Format currency
-  const formatCurrency = (value: number) => {
-    return `$${value.toLocaleString()}`;
-  };
+  const isLoading = isLoadingProjections || isLoadingFormulas || 
+                    isLoadingRevenueStreams || isLoadingExpenses || 
+                    isLoadingRoles;
 
   return (
-    <div className="h-screen flex flex-col overflow-hidden">
-      <Header user={user} />
-      
-      <div className="flex flex-1 overflow-hidden">
-        <Sidebar 
-          activeWorkspace={activeWorkspace}
-        />
+    <>
+      <Helmet>
+        <title>Financial Reports | FinanceForge</title>
+        <meta name="description" content="Generate comprehensive financial reports, analyze key performance indicators, and create custom calculations for your business." />
+      </Helmet>
 
-        <main className="flex-1 overflow-y-auto bg-neutral-lighter">
-          <ToolbarHeader 
-            title="Financial Reports"
-            onEdit={() => toast({ title: "Edit Reports", description: "Opening report settings" })}
-            scenarios={scenarios.map(s => ({ id: s.id, name: s.name }))}
-            activeScenario={scenarios.find(s => s.isActive)?.id}
-            onScenarioChange={setActiveScenario}
-            period={activePeriod}
-            onPeriodChange={setActivePeriod}
-          />
+      <div className="p-6">
+        <div className="flex justify-between items-center mb-6">
+          <div>
+            <h1 className="text-2xl font-bold">Financial Reports</h1>
+            <p className="text-muted-foreground">Generate and analyze financial reports</p>
+          </div>
+          <div className="flex gap-2">
+            <Select
+              value={reportPeriod}
+              onValueChange={setReportPeriod}
+            >
+              <SelectTrigger className="w-[180px]">
+                <Calendar className="mr-2 h-4 w-4" />
+                <SelectValue placeholder="Report Period" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="3">Last 3 months</SelectItem>
+                <SelectItem value="6">Last 6 months</SelectItem>
+                <SelectItem value="12">Last 12 months</SelectItem>
+                <SelectItem value="all">All time</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button variant="outline" onClick={() => setIsFormulaBuilderOpen(true)}>
+              <Settings className="mr-2 h-4 w-4" /> Formula Builder
+            </Button>
+            <Button variant="outline">
+              <Share2 className="mr-2 h-4 w-4" /> Share
+            </Button>
+            <Button>
+              <FileText className="mr-2 h-4 w-4" /> Generate PDF
+            </Button>
+          </div>
+        </div>
 
-          <div className="p-6 max-w-7xl mx-auto">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-lg font-medium text-neutral-darker">Financial Reports</h2>
-              <div className="flex space-x-3">
-                <Button 
-                  variant="outline"
-                  onClick={() => toast({ title: "Generate Report", description: "Generating PDF report" })}
-                >
-                  <MaterialIcon name="assignment" className="mr-2" />
-                  Generate PDF
-                </Button>
-                <Button 
-                  onClick={() => toast({ title: "Export Data", description: "Exporting financial data" })}
-                >
-                  <MaterialIcon name="filter_list" className="mr-2" />
-                  Export Data
-                </Button>
-              </div>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+          <TabsList>
+            <TabsTrigger value="financial" className="flex items-center">
+              <LineChartIcon className="mr-2 h-4 w-4" /> 
+              Financial Performance
+            </TabsTrigger>
+            <TabsTrigger value="revenue" className="flex items-center">
+              <BarChartIcon className="mr-2 h-4 w-4" /> 
+              Revenue Analysis
+            </TabsTrigger>
+            <TabsTrigger value="expenses" className="flex items-center">
+              <PieChartIcon className="mr-2 h-4 w-4" /> 
+              Expense Analysis
+            </TabsTrigger>
+            <TabsTrigger value="kpis" className="flex items-center">
+              <ClipboardList className="mr-2 h-4 w-4" /> 
+              Key Metrics
+            </TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="financial">
+            <div className="grid grid-cols-1 gap-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Financial Performance</CardTitle>
+                  <CardDescription>Revenue, expenses, and profit over time</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="h-80 mb-6">
+                    {isLoading ? (
+                      <div className="h-full flex items-center justify-center">
+                        <p>Loading financial data...</p>
+                      </div>
+                    ) : financialData.length === 0 ? (
+                      <div className="h-full flex items-center justify-center">
+                        <p className="text-muted-foreground">No financial data available</p>
+                      </div>
+                    ) : (
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart
+                          data={financialData}
+                          margin={{
+                            top: 5,
+                            right: 30,
+                            left: 20,
+                            bottom: 5,
+                          }}
+                        >
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis dataKey="name" />
+                          <YAxis tickFormatter={(value) => `$${value >= 1000 ? `${(value / 1000).toFixed(0)}k` : value}`} />
+                          <Tooltip formatter={(value) => [`$${Number(value).toLocaleString()}`, ""]} />
+                          <Legend />
+                          <Line type="monotone" dataKey="revenue" name="Revenue" stroke="#3B82F6" strokeWidth={2} activeDot={{ r: 8 }} />
+                          <Line type="monotone" dataKey="expenses" name="Expenses" stroke="#EF4444" strokeWidth={2} />
+                          <Line type="monotone" dataKey="personnel" name="Personnel" stroke="#8B5CF6" strokeWidth={2} />
+                          <Line type="monotone" dataKey="netProfit" name="Net Profit" stroke="#10B981" strokeWidth={2} />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    )}
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <Card>
+                      <CardContent className="p-4">
+                        <div className="text-sm font-medium text-muted-foreground mb-1">Average Revenue</div>
+                        <div className="text-2xl font-bold">
+                          ${financialData.length > 0
+                              ? Math.round(financialData.reduce((sum, item) => sum + item.revenue, 0) / financialData.length).toLocaleString()
+                              : "0"}
+                        </div>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardContent className="p-4">
+                        <div className="text-sm font-medium text-muted-foreground mb-1">Average Expenses</div>
+                        <div className="text-2xl font-bold">
+                          ${financialData.length > 0
+                              ? Math.round(financialData.reduce((sum, item) => sum + item.expenses + item.personnel, 0) / financialData.length).toLocaleString()
+                              : "0"}
+                        </div>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardContent className="p-4">
+                        <div className="text-sm font-medium text-muted-foreground mb-1">Gross Margin</div>
+                        <div className="text-2xl font-bold">
+                          {financialData.length > 0
+                            ? `${Math.round(financialData.reduce((sum, item) => sum + item.grossProfit, 0) / 
+                                financialData.reduce((sum, item) => sum + item.revenue, 0) * 100)}%`
+                            : "0%"}
+                        </div>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardContent className="p-4">
+                        <div className="text-sm font-medium text-muted-foreground mb-1">Net Profit Margin</div>
+                        <div className="text-2xl font-bold">
+                          {financialData.length > 0
+                            ? `${Math.round(financialData.reduce((sum, item) => sum + item.netProfit, 0) / 
+                                financialData.reduce((sum, item) => sum + item.revenue, 0) * 100)}%`
+                            : "0%"}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Profit & Loss Statement</CardTitle>
+                  <CardDescription>Monthly breakdown of your financial performance</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead>
+                        <tr>
+                          <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Period</th>
+                          <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Revenue</th>
+                          <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">COGS</th>
+                          <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Gross Profit</th>
+                          <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Expenses</th>
+                          <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Personnel</th>
+                          <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Net Profit</th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {financialData.map((period, index) => (
+                          <tr key={index}>
+                            <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-700">
+                              {period.name}
+                            </td>
+                            <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-700 text-right font-tabular">
+                              ${period.revenue.toLocaleString()}
+                            </td>
+                            <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-700 text-right font-tabular">
+                              ${period.cogs.toLocaleString()}
+                            </td>
+                            <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-700 text-right font-tabular">
+                              ${period.grossProfit.toLocaleString()}
+                            </td>
+                            <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-700 text-right font-tabular">
+                              ${period.expenses.toLocaleString()}
+                            </td>
+                            <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-700 text-right font-tabular">
+                              ${period.personnel.toLocaleString()}
+                            </td>
+                            <td className={`px-3 py-2 whitespace-nowrap text-sm font-medium text-right font-tabular ${
+                              period.netProfit >= 0 ? 'text-green-600' : 'text-red-600'
+                            }`}>
+                              ${period.netProfit.toLocaleString()}
+                            </td>
+                          </tr>
+                        ))}
+                        
+                        {/* Totals row */}
+                        {financialData.length > 0 && (
+                          <tr className="bg-gray-50 font-medium">
+                            <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900">
+                              Total
+                            </td>
+                            <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900 text-right font-tabular">
+                              ${financialData.reduce((sum, period) => sum + period.revenue, 0).toLocaleString()}
+                            </td>
+                            <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900 text-right font-tabular">
+                              ${financialData.reduce((sum, period) => sum + period.cogs, 0).toLocaleString()}
+                            </td>
+                            <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900 text-right font-tabular">
+                              ${financialData.reduce((sum, period) => sum + period.grossProfit, 0).toLocaleString()}
+                            </td>
+                            <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900 text-right font-tabular">
+                              ${financialData.reduce((sum, period) => sum + period.expenses, 0).toLocaleString()}
+                            </td>
+                            <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-900 text-right font-tabular">
+                              ${financialData.reduce((sum, period) => sum + period.personnel, 0).toLocaleString()}
+                            </td>
+                            <td className={`px-3 py-2 whitespace-nowrap text-sm font-medium text-right font-tabular ${
+                              financialData.reduce((sum, period) => sum + period.netProfit, 0) >= 0 ? 'text-green-600' : 'text-red-600'
+                            }`}>
+                              ${financialData.reduce((sum, period) => sum + period.netProfit, 0).toLocaleString()}
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </CardContent>
+              </Card>
             </div>
-            
-            <div className="space-y-8">
-              {/* Executive Summary */}
-              <Card className="bg-white rounded-lg shadow-sm p-5 border border-neutral-light">
-                <CardContent className="p-0">
-                  <h3 className="font-medium text-neutral-darker mb-4">Executive Summary</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                    <div className="bg-neutral-lighter p-4 rounded-md">
-                      <h4 className="text-sm font-medium text-neutral-dark mb-2">Monthly Revenue</h4>
-                      <div className="text-2xl font-semibold text-neutral-darker">$78,500</div>
-                      <div className="text-sm text-success mt-1">+12.4% month-over-month</div>
-                    </div>
-                    <div className="bg-neutral-lighter p-4 rounded-md">
-                      <h4 className="text-sm font-medium text-neutral-dark mb-2">Cash Balance</h4>
-                      <div className="text-2xl font-semibold text-neutral-darker">$620,000</div>
-                      <div className="text-sm text-success mt-1">+8.2% month-over-month</div>
-                    </div>
-                    <div className="bg-neutral-lighter p-4 rounded-md">
-                      <h4 className="text-sm font-medium text-neutral-dark mb-2">Burn Rate</h4>
-                      <div className="text-2xl font-semibold text-neutral-darker">$42,000</div>
-                      <div className="text-sm text-error mt-1">+8.5% month-over-month</div>
-                    </div>
-                    <div className="bg-neutral-lighter p-4 rounded-md">
-                      <h4 className="text-sm font-medium text-neutral-dark mb-2">Cash Runway</h4>
-                      <div className="text-2xl font-semibold text-neutral-darker">14.2 Months</div>
-                      <div className="text-sm text-success mt-1">+2.3 months</div>
-                    </div>
+          </TabsContent>
+          
+          <TabsContent value="revenue">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Revenue by Type</CardTitle>
+                  <CardDescription>Breakdown of revenue sources</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="h-80">
+                    {isLoading ? (
+                      <div className="h-full flex items-center justify-center">
+                        <p>Loading revenue data...</p>
+                      </div>
+                    ) : revenueByTypeData.length === 0 ? (
+                      <div className="h-full flex items-center justify-center">
+                        <p className="text-muted-foreground">No revenue data available</p>
+                      </div>
+                    ) : (
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie
+                            data={revenueByTypeData}
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={70}
+                            outerRadius={100}
+                            fill="#8884d8"
+                            paddingAngle={5}
+                            dataKey="value"
+                            label={({ name, percent }) => 
+                              `${name}: ${(percent * 100).toFixed(0)}%`
+                            }
+                          >
+                            {revenueByTypeData.map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                            ))}
+                          </Pie>
+                          <Tooltip formatter={(value) => `$${Number(value).toLocaleString()}`} />
+                          <Legend />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    )}
                   </div>
                 </CardContent>
               </Card>
               
-              {/* Revenue Report */}
-              <Card className="bg-white rounded-lg shadow-sm p-5 border border-neutral-light">
-                <CardContent className="p-0">
-                  <div className="flex justify-between items-center mb-6">
-                    <h3 className="font-medium text-neutral-darker">Revenue Report</h3>
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      onClick={() => toast({ title: "Export Revenue", description: "Exporting revenue data" })}
-                    >
-                      Export
-                    </Button>
+              <Card>
+                <CardHeader>
+                  <CardTitle>Revenue Growth</CardTitle>
+                  <CardDescription>Monthly revenue trends</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="h-80">
+                    {isLoading ? (
+                      <div className="h-full flex items-center justify-center">
+                        <p>Loading revenue data...</p>
+                      </div>
+                    ) : financialData.length === 0 ? (
+                      <div className="h-full flex items-center justify-center">
+                        <p className="text-muted-foreground">No revenue data available</p>
+                      </div>
+                    ) : (
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart
+                          data={financialData}
+                          margin={{
+                            top: 5,
+                            right: 30,
+                            left: 20,
+                            bottom: 5,
+                          }}
+                        >
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis dataKey="name" />
+                          <YAxis tickFormatter={(value) => `$${value >= 1000 ? `${(value / 1000).toFixed(0)}k` : value}`} />
+                          <Tooltip formatter={(value) => `$${Number(value).toLocaleString()}`} />
+                          <Legend />
+                          <Bar dataKey="revenue" name="Revenue" fill="#3B82F6" />
+                          <Bar dataKey="grossProfit" name="Gross Profit" fill="#10B981" />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    )}
                   </div>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                    <div>
-                      <h4 className="text-sm font-medium text-neutral-dark mb-3">Revenue Trend</h4>
-                      <div className="chart-container" style={{ height: "300px" }}>
-                        <ResponsiveContainer width="100%" height="100%">
-                          <LineChart
-                            data={reportsData?.revenueTrend || revenueData}
-                            margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                </CardContent>
+              </Card>
+              
+              <Card className="md:col-span-2">
+                <CardHeader>
+                  <CardTitle>Revenue Streams</CardTitle>
+                  <CardDescription>Detailed breakdown of your revenue sources</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead>
+                        <tr>
+                          <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stream Name</th>
+                          <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
+                          <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
+                          <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
+                          <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Frequency</th>
+                          <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Growth Rate</th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {isLoading ? (
+                          <tr>
+                            <td colSpan={6} className="px-3 py-4 text-center">Loading revenue streams...</td>
+                          </tr>
+                        ) : revenueStreams?.length === 0 ? (
+                          <tr>
+                            <td colSpan={6} className="px-3 py-4 text-center">No revenue streams found</td>
+                          </tr>
+                        ) : (
+                          revenueStreams?.map((stream) => (
+                            <tr key={stream.id} className="hover:bg-gray-50">
+                              <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-700">{stream.name}</td>
+                              <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-700">
+                                {stream.type.charAt(0).toUpperCase() + stream.type.slice(1)}
+                              </td>
+                              <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-700">{stream.category || "—"}</td>
+                              <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-700 text-right font-tabular">
+                                ${Number(stream.amount).toLocaleString()}
+                              </td>
+                              <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-700 text-right">
+                                {stream.frequency.charAt(0).toUpperCase() + stream.frequency.slice(1)}
+                              </td>
+                              <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-700 text-right">
+                                {(Number(stream.growthRate) * 100).toFixed(1)}%
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+          
+          <TabsContent value="expenses">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Expenses by Category</CardTitle>
+                  <CardDescription>Breakdown of expense categories</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="h-80">
+                    {isLoading ? (
+                      <div className="h-full flex items-center justify-center">
+                        <p>Loading expense data...</p>
+                      </div>
+                    ) : expensesByCategoryData.length === 0 ? (
+                      <div className="h-full flex items-center justify-center">
+                        <p className="text-muted-foreground">No expense data available</p>
+                      </div>
+                    ) : (
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie
+                            data={expensesByCategoryData}
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={70}
+                            outerRadius={100}
+                            fill="#8884d8"
+                            paddingAngle={5}
+                            dataKey="value"
+                            label={({ name, percent }) => 
+                              `${name}: ${(percent * 100).toFixed(0)}%`
+                            }
                           >
-                            <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                            <XAxis dataKey="month" />
-                            <YAxis tickFormatter={(value) => `$${value/1000}k`} />
-                            <Tooltip formatter={(value) => formatCurrency(value as number)} />
-                            <Line 
-                              type="monotone" 
-                              dataKey="value" 
-                              name="Revenue" 
-                              stroke="#0078D4" 
-                              strokeWidth={2} 
-                            />
-                          </LineChart>
-                        </ResponsiveContainer>
+                            {expensesByCategoryData.map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                            ))}
+                          </Pie>
+                          <Tooltip formatter={(value) => `$${Number(value).toLocaleString()}`} />
+                          <Legend />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+              
+              <Card>
+                <CardHeader>
+                  <CardTitle>Expense Trends</CardTitle>
+                  <CardDescription>Monthly expense patterns</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="h-80">
+                    {isLoading ? (
+                      <div className="h-full flex items-center justify-center">
+                        <p>Loading expense data...</p>
+                      </div>
+                    ) : financialData.length === 0 ? (
+                      <div className="h-full flex items-center justify-center">
+                        <p className="text-muted-foreground">No expense data available</p>
+                      </div>
+                    ) : (
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart
+                          data={financialData}
+                          margin={{
+                            top: 5,
+                            right: 30,
+                            left: 20,
+                            bottom: 5,
+                          }}
+                        >
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis dataKey="name" />
+                          <YAxis tickFormatter={(value) => `$${value >= 1000 ? `${(value / 1000).toFixed(0)}k` : value}`} />
+                          <Tooltip formatter={(value) => `$${Number(value).toLocaleString()}`} />
+                          <Legend />
+                          <Bar dataKey="expenses" name="Operating Expenses" fill="#EF4444" />
+                          <Bar dataKey="personnel" name="Personnel Costs" fill="#8B5CF6" />
+                          <Bar dataKey="cogs" name="COGS" fill="#F59E0B" />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+              
+              <Card className="md:col-span-2">
+                <CardHeader>
+                  <CardTitle>Expense List</CardTitle>
+                  <CardDescription>Detailed breakdown of your expenses</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead>
+                        <tr>
+                          <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Expense Name</th>
+                          <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
+                          <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
+                          <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Frequency</th>
+                          <th className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">COGS Related</th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {isLoading ? (
+                          <tr>
+                            <td colSpan={5} className="px-3 py-4 text-center">Loading expenses...</td>
+                          </tr>
+                        ) : expenses?.length === 0 ? (
+                          <tr>
+                            <td colSpan={5} className="px-3 py-4 text-center">No expenses found</td>
+                          </tr>
+                        ) : (
+                          expenses?.map((expense) => (
+                            <tr key={expense.id} className="hover:bg-gray-50">
+                              <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-700">{expense.name}</td>
+                              <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-700">{expense.category || "Uncategorized"}</td>
+                              <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-700 text-right font-tabular">
+                                ${Number(expense.amount).toLocaleString()}
+                              </td>
+                              <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-700 text-right">
+                                {expense.frequency.charAt(0).toUpperCase() + expense.frequency.slice(1)}
+                              </td>
+                              <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-700 text-center">
+                                {expense.isCogsRelated ? "Yes" : "No"}
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+          
+          <TabsContent value="kpis">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Key Performance Indicators</CardTitle>
+                  <CardDescription>Radar chart of main KPIs vs targets</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="h-80">
+                    {isLoading ? (
+                      <div className="h-full flex items-center justify-center">
+                        <p>Loading KPI data...</p>
+                      </div>
+                    ) : (
+                      <ResponsiveContainer width="100%" height="100%">
+                        <RadarChart cx="50%" cy="50%" outerRadius="80%" data={kpiData}>
+                          <PolarGrid />
+                          <PolarAngleAxis dataKey="subject" />
+                          <PolarRadiusAxis angle={30} domain={[0, 150]} />
+                          <Radar
+                            name="Current"
+                            dataKey="A"
+                            stroke="#3B82F6"
+                            fill="#3B82F6"
+                            fillOpacity={0.6}
+                          />
+                          <Radar
+                            name="Target"
+                            dataKey="B"
+                            stroke="#10B981"
+                            fill="#10B981"
+                            fillOpacity={0.6}
+                          />
+                          <Legend />
+                          <Tooltip />
+                        </RadarChart>
+                      </ResponsiveContainer>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+              
+              <Card>
+                <CardHeader>
+                  <CardTitle>Custom Formula Calculations</CardTitle>
+                  <CardDescription>Results from your custom formulas</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {isLoading ? (
+                    <div className="h-40 flex items-center justify-center">
+                      <p>Loading formula data...</p>
+                    </div>
+                  ) : formulas?.length === 0 ? (
+                    <div className="text-center py-10">
+                      <p className="text-muted-foreground mb-4">No custom formulas found</p>
+                      <Button onClick={() => setIsFormulaBuilderOpen(true)}>
+                        <Settings className="mr-2 h-4 w-4" /> Create Formula
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="space-y-6">
+                      {formulas?.map((formula) => (
+                        <div key={formula.id} className="bg-gray-50 rounded-lg p-4">
+                          <div className="flex justify-between items-start mb-2">
+                            <div>
+                              <h4 className="font-medium text-gray-900">{formula.name}</h4>
+                              <p className="text-sm text-gray-500">{formula.description || "No description"}</p>
+                            </div>
+                            <div className="text-sm bg-primary/10 text-primary rounded px-2 py-0.5">
+                              {formula.category || "General"}
+                            </div>
+                          </div>
+                          <div className="bg-white border border-gray-200 rounded px-3 py-2 text-sm font-mono">
+                            {formula.formula}
+                          </div>
+                          <div className="mt-2 flex justify-between items-center">
+                            <div className="text-sm text-gray-500">Last calculated: Today</div>
+                            <div className="text-lg font-bold text-gray-900">$1,234,567</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+              
+              <Card className="lg:col-span-2">
+                <CardHeader>
+                  <CardTitle>Report Configuration</CardTitle>
+                  <CardDescription>Choose metrics to include in reports</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div className="space-y-4">
+                      <h3 className="font-medium">Financial Metrics</h3>
+                      <div className="space-y-2">
+                        <div className="flex items-center space-x-2">
+                          <Checkbox id="metric-revenue" defaultChecked />
+                          <Label htmlFor="metric-revenue">Revenue</Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Checkbox id="metric-gross-profit" defaultChecked />
+                          <Label htmlFor="metric-gross-profit">Gross Profit</Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Checkbox id="metric-expenses" defaultChecked />
+                          <Label htmlFor="metric-expenses">Expenses</Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Checkbox id="metric-net-profit" defaultChecked />
+                          <Label htmlFor="metric-net-profit">Net Profit</Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Checkbox id="metric-cash-flow" defaultChecked />
+                          <Label htmlFor="metric-cash-flow">Cash Flow</Label>
+                        </div>
                       </div>
                     </div>
                     
-                    <div>
-                      <h4 className="text-sm font-medium text-neutral-dark mb-3">Revenue by Stream</h4>
-                      <div className="chart-container" style={{ height: "300px" }}>
-                        <ResponsiveContainer width="100%" height="100%">
-                          <PieChart>
-                            <Pie
-                              data={reportsData?.revenueByStream || revenueByStream}
-                              cx="50%"
-                              cy="50%"
-                              labelLine={false}
-                              outerRadius={100}
-                              fill="#8884d8"
-                              dataKey="value"
-                              nameKey="name"
-                              label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                            >
-                              {(reportsData?.revenueByStream || revenueByStream).map((entry, index) => (
-                                <Cell 
-                                  key={`cell-${index}`} 
-                                  fill={[
-                                    "#0078D4", 
-                                    "#2B88D8", 
-                                    "#50E6FF", 
-                                    "#EDEBE9"
-                                  ][index % 4]} 
-                                />
-                              ))}
-                            </Pie>
-                            <Tooltip formatter={(value) => formatCurrency(value as number)} />
-                            <Legend />
-                          </PieChart>
-                        </ResponsiveContainer>
+                    <div className="space-y-4">
+                      <h3 className="font-medium">Business Metrics</h3>
+                      <div className="space-y-2">
+                        <div className="flex items-center space-x-2">
+                          <Checkbox id="metric-users" defaultChecked />
+                          <Label htmlFor="metric-users">User Growth</Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Checkbox id="metric-conversion" defaultChecked />
+                          <Label htmlFor="metric-conversion">Conversion Rate</Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Checkbox id="metric-arpu" defaultChecked />
+                          <Label htmlFor="metric-arpu">ARPU</Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Checkbox id="metric-cac" defaultChecked />
+                          <Label htmlFor="metric-cac">CAC</Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Checkbox id="metric-ltv" defaultChecked />
+                          <Label htmlFor="metric-ltv">LTV</Label>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-4">
+                      <h3 className="font-medium">Additional Options</h3>
+                      <div className="space-y-2">
+                        <div className="flex items-center space-x-2">
+                          <Checkbox id="option-charts" defaultChecked />
+                          <Label htmlFor="option-charts">Include Charts</Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Checkbox id="option-tables" defaultChecked />
+                          <Label htmlFor="option-tables">Include Tables</Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Checkbox id="option-comparisons" defaultChecked />
+                          <Label htmlFor="option-comparisons">YoY Comparisons</Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Checkbox id="option-custom" defaultChecked />
+                          <Label htmlFor="option-custom">Custom Formulas</Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Checkbox id="option-executive" defaultChecked />
+                          <Label htmlFor="option-executive">Executive Summary</Label>
+                        </div>
                       </div>
                     </div>
                   </div>
-                </CardContent>
-              </Card>
-              
-              {/* Expense Report */}
-              <Card className="bg-white rounded-lg shadow-sm p-5 border border-neutral-light">
-                <CardContent className="p-0">
-                  <div className="flex justify-between items-center mb-6">
-                    <h3 className="font-medium text-neutral-darker">Expense Report</h3>
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      onClick={() => toast({ title: "Export Expenses", description: "Exporting expense data" })}
-                    >
-                      Export
+                  
+                  <div className="mt-6 flex justify-end">
+                    <Button>
+                      <FileText className="mr-2 h-4 w-4" /> Generate Custom Report
                     </Button>
-                  </div>
-                  
-                  <div className="chart-container" style={{ height: "300px" }}>
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart
-                        data={reportsData?.expensesByCategory || expensesByCategory}
-                        margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-                        layout="vertical"
-                      >
-                        <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
-                        <XAxis type="number" tickFormatter={(value) => `$${value/1000}k`} />
-                        <YAxis type="category" dataKey="name" width={150} />
-                        <Tooltip formatter={(value) => formatCurrency(value as number)} />
-                        <Bar 
-                          dataKey="value" 
-                          name="Expense" 
-                          fill="#A19F9D" 
-                          radius={[0, 4, 4, 0]} 
-                        />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                  
-                  <div className="mt-6">
-                    <h4 className="text-sm font-medium text-neutral-dark mb-3">Expense Analysis</h4>
-                    <div className="text-sm text-neutral-dark">
-                      <p>
-                        Personnel costs represent the largest expense category at 56.8% of total expenses,
-                        followed by marketing costs at 26.3%. Software & tools and office operations account
-                        for 7.1% and 9.8% respectively.
-                      </p>
-                      <p className="mt-2">
-                        Monthly expenses are growing at an average rate of 5% month-over-month, driven
-                        primarily by increases in personnel costs as the team expands.
-                      </p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-              
-              {/* Key Metrics */}
-              <Card className="bg-white rounded-lg shadow-sm p-5 border border-neutral-light">
-                <CardContent className="p-0">
-                  <h3 className="font-medium text-neutral-darker mb-6">Key Financial Metrics</h3>
-                  
-                  <div className="overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Metric</TableHead>
-                          <TableHead className="text-right">Value</TableHead>
-                          <TableHead className="text-right">Change</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {(reportsData?.metrics || metricsTable).map((row, index) => (
-                          <TableRow key={index}>
-                            <TableCell className="font-medium">{row.metric}</TableCell>
-                            <TableCell className="text-right">{row.value}</TableCell>
-                            <TableCell className={`text-right ${
-                              row.changeType === "positive" ? "text-success" : 
-                              row.changeType === "negative" ? "text-error" : 
-                              "text-neutral-dark"
-                            }`}>
-                              {row.change}
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                </CardContent>
-              </Card>
-              
-              {/* Cash Flow Statement */}
-              <Card className="bg-white rounded-lg shadow-sm p-5 border border-neutral-light">
-                <CardContent className="p-0">
-                  <div className="flex justify-between items-center mb-6">
-                    <h3 className="font-medium text-neutral-darker">Cash Flow Statement</h3>
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      onClick={() => toast({ title: "Export Cash Flow", description: "Exporting cash flow data" })}
-                    >
-                      Export
-                    </Button>
-                  </div>
-                  
-                  <div className="overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Month</TableHead>
-                          <TableHead className="text-right">Revenue</TableHead>
-                          <TableHead className="text-right">Expenses</TableHead>
-                          <TableHead className="text-right">Net Cash Flow</TableHead>
-                          <TableHead className="text-right">Ending Balance</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {(reportsData?.cashFlow || cashFlowTable).map((row, index) => (
-                          <TableRow key={index}>
-                            <TableCell>{row.month}</TableCell>
-                            <TableCell className="text-right">{formatCurrency(row.revenue)}</TableCell>
-                            <TableCell className="text-right">{formatCurrency(row.expenses)}</TableCell>
-                            <TableCell className={`text-right ${row.cashFlow >= 0 ? "text-success" : "text-error"}`}>
-                              {formatCurrency(row.cashFlow)}
-                            </TableCell>
-                            <TableCell className="text-right font-medium">{formatCurrency(row.balance)}</TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                </CardContent>
-              </Card>
-              
-              {/* Notes */}
-              <Card className="bg-white rounded-lg shadow-sm p-5 border border-neutral-light">
-                <CardContent className="p-0">
-                  <h3 className="font-medium text-neutral-darker mb-4">Notes & Assumptions</h3>
-                  
-                  <div className="text-sm text-neutral-dark">
-                    <p>
-                      This report is based on the "Base Scenario" with the following key assumptions:
-                    </p>
-                    <ul className="list-disc pl-5 mt-2 space-y-1">
-                      <li>Monthly revenue growth rate of 10%</li>
-                      <li>Customer churn rate of 3.5% monthly</li>
-                      <li>Expense growth rate of 5% monthly</li>
-                      <li>Headcount growth of 15% annually</li>
-                      <li>Cash runway calculation assumes continuing burn rate at current levels</li>
-                    </ul>
-                    <p className="mt-4">
-                      All projections are estimates and actual results may vary. The data in this
-                      report should be used for planning purposes only and does not constitute
-                      financial advice.
-                    </p>
                   </div>
                 </CardContent>
               </Card>
             </div>
-          </div>
-        </main>
+          </TabsContent>
+        </Tabs>
       </div>
-    </div>
+
+      {/* Formula Builder Modal */}
+      <FormulaBuilder
+        forecastId={forecastId}
+        open={isFormulaBuilderOpen}
+        onOpenChange={setIsFormulaBuilderOpen}
+      />
+    </>
   );
 };
 

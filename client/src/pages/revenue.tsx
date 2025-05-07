@@ -1,275 +1,408 @@
-import React, { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { useToast } from "@/hooks/use-toast";
-import { Header, ToolbarHeader } from "@/components/layout/header";
-import { Sidebar } from "@/components/layout/sidebar";
-import { Card, CardContent } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { 
+  Card, 
+  CardHeader, 
+  CardTitle, 
+  CardDescription, 
+  CardContent 
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { apiRequest } from "@/lib/queryClient";
+import { 
+  LineChart, 
+  Line, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  Tooltip, 
+  Legend, 
+  ResponsiveContainer,
+  BarChart,
+  Bar
+} from "recharts";
+import { 
+  Plus, 
+  Edit2, 
+  Trash2, 
+  DollarSign, 
+  BarChart2,
+  BarChart as BarChartIcon,
+  PieChart,
+  Settings
+} from "lucide-react";
+import { Helmet } from "react-helmet";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { RevenueChart, RevenueChartData } from "@/components/dashboard/revenue-chart";
-import { RevenueBreakdown, RevenueStreamData } from "@/components/dashboard/revenue-breakdown";
-import { MaterialIcon } from "@/components/ui/ui-icons";
-import { Badge } from "@/components/ui/badge";
-import { useFinancialContext } from "@/contexts/financial-context";
+import { Label } from "@/components/ui/label";
+import { useToast } from "@/hooks/use-toast";
 
-const Revenue: React.FC = () => {
+const Revenue = () => {
+  const [activeTab, setActiveTab] = useState("streams");
+  const [isAddStreamDialogOpen, setIsAddStreamDialogOpen] = useState(false);
+  const [isAddDriverDialogOpen, setIsAddDriverDialogOpen] = useState(false);
+  const queryClient = useQueryClient();
   const { toast } = useToast();
-  const { activeWorkspace, scenarios, setActiveScenario, activePeriod, setActivePeriod } = useFinancialContext();
-
-  // Current user
-  const [user] = useState({
-    id: 1,
-    fullName: "John Smith",
-    initials: "JS"
-  });
-
-  // Active tab state
-  const [activeTab, setActiveTab] = useState("overview");
-
-  // Fetch data
-  const { data: revenueData, isLoading: isLoadingRevenue } = useQuery({
-    queryKey: ['/api/workspaces/1/revenue-chart'],
-    enabled: !!activeWorkspace
-  });
-
-  const { data: revenueStreamsData, isLoading: isLoadingStreams } = useQuery({
-    queryKey: ['/api/workspaces/1/revenue-streams'],
-    enabled: !!activeWorkspace
-  });
-
-  const { data: revenueBreakdownData, isLoading: isLoadingRevenueBreakdown } = useQuery({
-    queryKey: ['/api/workspaces/1/revenue-breakdown'],
-    enabled: !!activeWorkspace
-  });
-
-  // Mock data for demonstration - in a real app, this would come from the API
-  const revenueChartData: RevenueChartData[] = [
-    { month: "Jan", actual: 25200, projected: 28000 },
-    { month: "Feb", actual: 27300, projected: 32000 },
-    { month: "Mar", actual: 28900, projected: 36000 },
-    { month: "Apr", actual: 30100, projected: 40000 },
-    { month: "May", actual: 32500, projected: 44000 },
-    { month: "Jun", actual: 0, projected: 48000 }
-  ];
-
-  const revenueStreams: RevenueStreamData[] = [
-    {
-      id: "basic-subscription",
-      name: "Basic Subscription",
-      months: {
-        "May 2023": 25200,
-        "Jun 2023": 27300,
-        "Jul 2023": 28900,
-        "Aug 2023": 30100,
-        "Sep 2023": 32500
-      },
-      ytd: 144000
-    },
-    {
-      id: "premium-tier",
-      name: "Premium Tier",
-      months: {
-        "May 2023": 18500,
-        "Jun 2023": 19200,
-        "Jul 2023": 21800,
-        "Aug 2023": 23400,
-        "Sep 2023": 25000
-      },
-      ytd: 107900
-    },
-    {
-      id: "enterprise-plans",
-      name: "Enterprise Plans",
-      months: {
-        "May 2023": 15000,
-        "Jun 2023": 15000,
-        "Jul 2023": 15000,
-        "Aug 2023": 20000,
-        "Sep 2023": 20000
-      },
-      ytd: 85000
-    },
-    {
-      id: "one-time-services",
-      name: "One-time Services",
-      months: {
-        "May 2023": 4800,
-        "Jun 2023": 3200,
-        "Jul 2023": 5300,
-        "Aug 2023": 2900,
-        "Sep 2023": 3500
-      },
-      ytd: 19700
-    }
-  ];
-
-  const months = ["May 2023", "Jun 2023", "Jul 2023", "Aug 2023", "Sep 2023"];
-  const latestMonth = "Sep 2023";
   
-  const totalRevenue = {
-    months: {
-      "May 2023": 63500,
-      "Jun 2023": 64700,
-      "Jul 2023": 71000,
-      "Aug 2023": 76400,
-      "Sep 2023": 81000
+  // Demo user ID for MVP
+  const userId = 1;
+  
+  // Get the active forecast
+  const { data: forecasts } = useQuery({
+    queryKey: ["/api/forecasts", { userId }],
+    queryFn: async () => {
+      const res = await fetch(`/api/forecasts?userId=${userId}`);
+      if (!res.ok) throw new Error("Failed to fetch forecasts");
+      return res.json();
     },
-    ytd: 356600
-  };
+  });
 
-  // Event handlers
-  const handleAddRevenueStream = () => {
-    toast({
-      title: "Add Revenue Stream",
-      description: "Opening revenue stream form"
+  const activeForecast = forecasts?.[0];
+  const forecastId = activeForecast?.id;
+
+  // Fetch revenue streams
+  const { data: revenueStreams, isLoading: isLoadingStreams } = useQuery({
+    queryKey: ["/api/revenue-streams", { forecastId }],
+    queryFn: async () => {
+      if (!forecastId) throw new Error("No forecast selected");
+      const res = await fetch(`/api/revenue-streams?forecastId=${forecastId}`);
+      if (!res.ok) throw new Error("Failed to fetch revenue streams");
+      return res.json();
+    },
+    enabled: !!forecastId,
+  });
+
+  // Fetch revenue drivers
+  const { data: revenueDrivers, isLoading: isLoadingDrivers } = useQuery({
+    queryKey: ["/api/revenue-drivers", { forecastId }],
+    queryFn: async () => {
+      if (!forecastId) throw new Error("No forecast selected");
+      const res = await fetch(`/api/revenue-drivers?forecastId=${forecastId}`);
+      if (!res.ok) throw new Error("Failed to fetch revenue drivers");
+      return res.json();
+    },
+    enabled: !!forecastId,
+  });
+
+  // Mutations for revenue streams
+  const addRevenueStreamMutation = useMutation({
+    mutationFn: async (newStream) => {
+      return await apiRequest("POST", "/api/revenue-streams", newStream);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/revenue-streams"] });
+      setIsAddStreamDialogOpen(false);
+      toast({
+        title: "Revenue stream added",
+        description: "New revenue stream has been added successfully",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: `Failed to add revenue stream: ${error.message}`,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Mutations for revenue drivers
+  const addRevenueDriverMutation = useMutation({
+    mutationFn: async (newDriver) => {
+      return await apiRequest("POST", "/api/revenue-drivers", newDriver);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/revenue-drivers"] });
+      setIsAddDriverDialogOpen(false);
+      toast({
+        title: "Revenue driver added",
+        description: "New revenue driver has been added successfully",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: `Failed to add revenue driver: ${error.message}`,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Form handlers
+  const handleAddRevenueStream = (e) => {
+    e.preventDefault();
+    const formData = new FormData(e.target);
+    
+    addRevenueStreamMutation.mutate({
+      forecastId,
+      name: formData.get("name"),
+      type: formData.get("type"),
+      amount: formData.get("amount"),
+      frequency: formData.get("frequency"),
+      growthRate: formData.get("growthRate"),
+      category: formData.get("category"),
     });
   };
 
-  const handleEditDrivers = () => {
-    toast({
-      title: "Edit Revenue Drivers",
-      description: "Opening revenue drivers editor"
+  const handleAddRevenueDriver = (e) => {
+    e.preventDefault();
+    const formData = new FormData(e.target);
+    
+    addRevenueDriverMutation.mutate({
+      forecastId,
+      name: formData.get("name"),
+      value: formData.get("value"),
+      unit: formData.get("unit"),
+      minValue: formData.get("minValue"),
+      maxValue: formData.get("maxValue"),
+      growthRate: formData.get("growthRate"),
+      category: formData.get("category"),
     });
   };
+
+  // Chart data transformation
+  const revenueChartData = revenueStreams?.map(stream => ({
+    name: stream.name,
+    value: Number(stream.amount),
+    growthRate: Number(stream.growthRate) * 100,
+  })) || [];
+
+  const isLoading = isLoadingStreams || isLoadingDrivers;
 
   return (
-    <div className="h-screen flex flex-col overflow-hidden">
-      <Header user={user} />
-      
-      <div className="flex flex-1 overflow-hidden">
-        <Sidebar 
-          activeWorkspace={activeWorkspace}
-        />
+    <>
+      <Helmet>
+        <title>Revenue Management | FinanceForge</title>
+        <meta name="description" content="Manage your revenue streams and drivers, forecast revenue growth, and analyze revenue patterns." />
+      </Helmet>
 
-        <main className="flex-1 overflow-y-auto bg-neutral-lighter">
-          <ToolbarHeader 
-            title="Revenue Management"
-            onEdit={() => toast({ title: "Edit Revenue Settings", description: "Opening revenue settings" })}
-            scenarios={scenarios.map(s => ({ id: s.id, name: s.name }))}
-            activeScenario={scenarios.find(s => s.isActive)?.id}
-            onScenarioChange={setActiveScenario}
-            period={activePeriod}
-            onPeriodChange={setActivePeriod}
-          />
+      <div className="p-6">
+        <div className="flex justify-between items-center mb-6">
+          <div>
+            <h1 className="text-2xl font-bold">Revenue Management</h1>
+            <p className="text-muted-foreground">Manage and forecast your revenue streams and drivers</p>
+          </div>
+          <div className="flex gap-2">
+            {activeTab === "streams" ? (
+              <Button onClick={() => setIsAddStreamDialogOpen(true)}>
+                <Plus className="mr-2 h-4 w-4" /> Add Revenue Stream
+              </Button>
+            ) : (
+              <Button onClick={() => setIsAddDriverDialogOpen(true)}>
+                <Plus className="mr-2 h-4 w-4" /> Add Revenue Driver
+              </Button>
+            )}
+          </div>
+        </div>
 
-          <div className="p-6 max-w-7xl mx-auto">
-            <Tabs defaultValue="overview" className="mb-8" onValueChange={setActiveTab}>
-              <TabsList className="grid grid-cols-3 w-full max-w-md mb-6">
-                <TabsTrigger value="overview">Overview</TabsTrigger>
-                <TabsTrigger value="streams">Revenue Streams</TabsTrigger>
-                <TabsTrigger value="drivers">Revenue Drivers</TabsTrigger>
-              </TabsList>
-              
-              <TabsContent value="overview" className="space-y-8">
-                <RevenueChart 
-                  data={revenueData?.data || revenueChartData} 
-                  isLoading={isLoadingRevenue}
-                  onFilter={() => toast({ title: "Filter Revenue Chart" })}
-                  onMoreOptions={() => toast({ title: "More Options", description: "Revenue chart options" })}
-                />
-                
-                <RevenueBreakdown 
-                  streams={revenueBreakdownData?.streams || revenueStreams}
-                  months={months}
-                  latestMonth={latestMonth}
-                  total={totalRevenue}
-                  isLoading={isLoadingRevenueBreakdown}
-                  onEditDrivers={handleEditDrivers}
-                  onMoreOptions={() => toast({ title: "More Options", description: "Revenue breakdown options" })}
-                />
-
-                <Card className="bg-white rounded-lg shadow-sm p-5 border border-neutral-light">
-                  <CardContent className="p-0">
-                    <h3 className="font-medium text-neutral-darker mb-6">Revenue Summary</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                      <div className="bg-neutral-lighter p-4 rounded-md">
-                        <h4 className="text-sm font-medium text-neutral-dark mb-2">Total Revenue YTD</h4>
-                        <div className="text-2xl font-semibold text-neutral-darker">${totalRevenue.ytd.toLocaleString()}</div>
-                        <div className="text-sm text-success mt-1">+15.2% year-over-year</div>
-                      </div>
-                      <div className="bg-neutral-lighter p-4 rounded-md">
-                        <h4 className="text-sm font-medium text-neutral-dark mb-2">Average Monthly Revenue</h4>
-                        <div className="text-2xl font-semibold text-neutral-darker">$71,320</div>
-                        <div className="text-sm text-success mt-1">+7.5% vs. last quarter</div>
-                      </div>
-                      <div className="bg-neutral-lighter p-4 rounded-md">
-                        <h4 className="text-sm font-medium text-neutral-dark mb-2">Revenue Growth Rate</h4>
-                        <div className="text-2xl font-semibold text-neutral-darker">12.4%</div>
-                        <div className="text-sm text-success mt-1">+2.1% vs. target</div>
-                      </div>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid w-full grid-cols-2 mb-6">
+            <TabsTrigger value="streams">Revenue Streams</TabsTrigger>
+            <TabsTrigger value="drivers">Revenue Drivers</TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="streams" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Revenue Breakdown</CardTitle>
+                <CardDescription>Visualization of your revenue streams</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="h-80">
+                  {isLoading ? (
+                    <div className="h-full flex items-center justify-center">
+                      <p>Loading revenue data...</p>
                     </div>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-              
-              <TabsContent value="streams" className="space-y-4">
-                <div className="flex justify-between items-center mb-4">
-                  <h3 className="text-lg font-medium text-neutral-darker">Revenue Streams</h3>
-                  <Button onClick={handleAddRevenueStream}>
-                    <MaterialIcon name="add_circle" className="mr-2" />
-                    Add Revenue Stream
-                  </Button>
+                  ) : (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={revenueChartData}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="name" />
+                        <YAxis />
+                        <Tooltip formatter={(value) => `$${value.toLocaleString()}`} />
+                        <Legend />
+                        <Bar dataKey="value" name="Revenue Amount" fill="#3B82F6" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  )}
                 </div>
-                
-                {isLoadingStreams ? (
-                  <div className="space-y-4 animate-pulse">
-                    {[1, 2, 3, 4].map((i) => (
-                      <div key={i} className="h-24 bg-white rounded-lg shadow-sm border border-neutral-light"></div>
-                    ))}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Revenue Streams</CardTitle>
+                <CardDescription>Manage your different revenue sources</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {isLoading ? (
+                  <div className="h-40 flex items-center justify-center">
+                    <p>Loading revenue streams...</p>
                   </div>
                 ) : (
-                  <div className="space-y-4">
-                    {revenueStreams.map((stream) => (
-                      <Card key={stream.id} className="bg-white shadow-sm border border-neutral-light">
-                        <CardContent className="p-4">
-                          <div className="flex flex-col md:flex-row justify-between">
-                            <div>
-                              <div className="flex items-center mb-2">
-                                <h4 className="font-medium text-neutral-darker">{stream.name}</h4>
-                                <Badge className="ml-2 bg-primary-light bg-opacity-20 text-primary">
-                                  {stream.id === "basic-subscription" || stream.id === "premium-tier" || stream.id === "enterprise-plans" 
-                                    ? "Subscription" 
-                                    : "One-time"}
-                                </Badge>
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="border-b">
+                          <th className="py-3 px-2 text-left">Name</th>
+                          <th className="py-3 px-2 text-left">Type</th>
+                          <th className="py-3 px-2 text-right">Amount</th>
+                          <th className="py-3 px-2 text-right">Frequency</th>
+                          <th className="py-3 px-2 text-right">Growth Rate</th>
+                          <th className="py-3 px-2 text-right">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {revenueStreams?.map((stream) => (
+                          <tr key={stream.id} className="border-b hover:bg-gray-50">
+                            <td className="py-3 px-2">{stream.name}</td>
+                            <td className="py-3 px-2">{stream.type}</td>
+                            <td className="py-3 px-2 text-right">${Number(stream.amount).toLocaleString()}</td>
+                            <td className="py-3 px-2 text-right">{stream.frequency}</td>
+                            <td className="py-3 px-2 text-right">
+                              {Number(stream.growthRate) * 100}%
+                            </td>
+                            <td className="py-3 px-2 text-right">
+                              <div className="flex justify-end gap-2">
+                                <Button variant="ghost" size="icon">
+                                  <Edit2 className="h-4 w-4" />
+                                </Button>
+                                <Button variant="ghost" size="icon">
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
                               </div>
-                              <p className="text-sm text-neutral-dark mb-4">
-                                {stream.id === "basic-subscription" 
-                                  ? "Monthly basic tier subscription at $49/month" 
-                                  : stream.id === "premium-tier"
-                                  ? "Monthly premium tier subscription at $99/month"
-                                  : stream.id === "enterprise-plans"
-                                  ? "Annual enterprise contracts starting at $15,000/year"
-                                  : "Implementation and consulting services"}
-                              </p>
-                              <div className="flex space-x-6">
-                                <div>
-                                  <div className="text-xs text-neutral-dark">Current Month</div>
-                                  <div className="text-lg font-medium text-neutral-darker">
-                                    ${stream.months[latestMonth].toLocaleString()}
-                                  </div>
-                                </div>
-                                <div>
-                                  <div className="text-xs text-neutral-dark">YTD</div>
-                                  <div className="text-lg font-medium text-neutral-darker">
-                                    ${stream.ytd.toLocaleString()}
-                                  </div>
-                                </div>
-                                <div>
-                                  <div className="text-xs text-neutral-dark">% of Total</div>
-                                  <div className="text-lg font-medium text-neutral-darker">
-                                    {((stream.ytd / totalRevenue.ytd) * 100).toFixed(1)}%
-                                  </div>
-                                </div>
-                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="drivers" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Revenue Drivers Performance</CardTitle>
+                <CardDescription>Track how your key revenue drivers are performing</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="h-80">
+                  {isLoading ? (
+                    <div className="h-full flex items-center justify-center">
+                      <p>Loading driver data...</p>
+                    </div>
+                  ) : (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart
+                        data={[
+                          { name: 'Jan', MAU: 42000, ConvRate: 5.5, ARPU: 84 },
+                          { name: 'Feb', MAU: 42800, ConvRate: 5.6, ARPU: 85 },
+                          { name: 'Mar', MAU: 43500, ConvRate: 5.7, ARPU: 86 },
+                          { name: 'Apr', MAU: 44200, ConvRate: 5.7, ARPU: 87 },
+                          { name: 'May', MAU: 45200, ConvRate: 5.8, ARPU: 89 },
+                        ]}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="name" />
+                        <YAxis yAxisId="left" domain={[30000, 50000]} />
+                        <YAxis yAxisId="right" orientation="right" domain={[0, 100]} />
+                        <Tooltip />
+                        <Legend />
+                        <Line
+                          yAxisId="left"
+                          type="monotone"
+                          dataKey="MAU"
+                          name="Monthly Active Users"
+                          stroke="#3B82F6"
+                          activeDot={{ r: 8 }}
+                        />
+                        <Line
+                          yAxisId="right"
+                          type="monotone"
+                          dataKey="ConvRate"
+                          name="Conversion Rate (%)"
+                          stroke="#10B981"
+                          activeDot={{ r: 8 }}
+                        />
+                        <Line
+                          yAxisId="right"
+                          type="monotone"
+                          dataKey="ARPU"
+                          name="ARPU ($)"
+                          stroke="#8B5CF6"
+                          activeDot={{ r: 8 }}
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Revenue Drivers</CardTitle>
+                <CardDescription>Manage your revenue driving metrics</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {isLoading ? (
+                  <div className="h-40 flex items-center justify-center">
+                    <p>Loading revenue drivers...</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {revenueDrivers?.map((driver) => (
+                      <Card key={driver.id} className="bg-gray-50 border">
+                        <CardContent className="pt-6">
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center">
+                              <span className="text-sm font-medium text-gray-700">{driver.name}</span>
+                              <Button variant="ghost" size="icon" className="ml-1 h-6 w-6">
+                                <Edit2 className="h-3 w-3" />
+                              </Button>
                             </div>
-                            <div className="flex items-center space-x-3 mt-4 md:mt-0">
-                              <Button variant="outline" size="sm" onClick={() => toast({ title: "Edit Stream", description: `Editing ${stream.name}` })}>
-                                Edit
-                              </Button>
-                              <Button variant="outline" size="sm" onClick={() => toast({ title: "Manage Drivers", description: `Managing drivers for ${stream.name}` })}>
-                                Drivers
-                              </Button>
+                            <div className="flex items-center">
+                              <span className="text-sm font-medium text-gray-900">
+                                {Number(driver.value).toLocaleString()} {driver.unit}
+                              </span>
+                              <span className="ml-2 text-xs font-medium text-green-600">
+                                ↑ {Number(driver.growthRate) * 100}%
+                              </span>
+                            </div>
+                          </div>
+                          
+                          <div className="relative">
+                            <div className="flex h-2 mb-2 overflow-hidden text-xs bg-gray-100 rounded-full">
+                              <div 
+                                className="flex flex-col justify-center text-center text-white bg-blue-500 shadow-none whitespace-nowrap h-2"
+                                style={{ 
+                                  width: `${Math.min(100, Math.max(0, (Number(driver.value) - Number(driver.minValue || 0)) / (Number(driver.maxValue || 100) - Number(driver.minValue || 0)) * 100))}%` 
+                                }}
+                              ></div>
+                            </div>
+                            <div className="flex text-xs justify-between font-medium">
+                              <span>{driver.minValue || 0}</span>
+                              <span>{Number(driver.minValue || 0) + (Number(driver.maxValue || 100) - Number(driver.minValue || 0)) / 2}</span>
+                              <span>{driver.maxValue || 100}</span>
                             </div>
                           </div>
                         </CardContent>
@@ -277,116 +410,221 @@ const Revenue: React.FC = () => {
                     ))}
                   </div>
                 )}
-              </TabsContent>
-              
-              <TabsContent value="drivers" className="space-y-4">
-                <div className="flex justify-between items-center mb-4">
-                  <h3 className="text-lg font-medium text-neutral-darker">Revenue Drivers</h3>
-                  <Button onClick={() => toast({ title: "Add Driver", description: "Opening new driver form" })}>
-                    <MaterialIcon name="add_circle" className="mr-2" />
-                    Add Driver
-                  </Button>
-                </div>
-                
-                <Card className="bg-white shadow-sm border border-neutral-light">
-                  <CardContent className="p-4">
-                    <h3 className="font-medium text-neutral-darker mb-4">Basic Subscription Drivers</h3>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-                      <div>
-                        <label className="block text-sm font-medium text-neutral-dark mb-2">
-                          Monthly New Customers
-                        </label>
-                        <Input 
-                          type="number" 
-                          defaultValue="120" 
-                          className="border-neutral-light"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-neutral-dark mb-2">
-                          Price Per Month ($)
-                        </label>
-                        <Input 
-                          type="number" 
-                          defaultValue="49" 
-                          className="border-neutral-light"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-neutral-dark mb-2">
-                          Churn Rate (%)
-                        </label>
-                        <Input 
-                          type="number" 
-                          defaultValue="3.5" 
-                          className="border-neutral-light"
-                        />
-                      </div>
-                    </div>
-                    
-                    <div className="flex justify-end">
-                      <Button 
-                        onClick={() => toast({ title: "Update Drivers", description: "Basic Subscription drivers updated" })}
-                      >
-                        Update
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-                
-                <Card className="bg-white shadow-sm border border-neutral-light">
-                  <CardContent className="p-4">
-                    <h3 className="font-medium text-neutral-darker mb-4">Premium Tier Drivers</h3>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-                      <div>
-                        <label className="block text-sm font-medium text-neutral-dark mb-2">
-                          Monthly New Customers
-                        </label>
-                        <Input 
-                          type="number" 
-                          defaultValue="45" 
-                          className="border-neutral-light"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-neutral-dark mb-2">
-                          Price Per Month ($)
-                        </label>
-                        <Input 
-                          type="number" 
-                          defaultValue="99" 
-                          className="border-neutral-light"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-neutral-dark mb-2">
-                          Churn Rate (%)
-                        </label>
-                        <Input 
-                          type="number" 
-                          defaultValue="2.8" 
-                          className="border-neutral-light"
-                        />
-                      </div>
-                    </div>
-                    
-                    <div className="flex justify-end">
-                      <Button 
-                        onClick={() => toast({ title: "Update Drivers", description: "Premium Tier drivers updated" })}
-                      >
-                        Update
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-            </Tabs>
-          </div>
-        </main>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
       </div>
-    </div>
+
+      {/* Add Revenue Stream Dialog */}
+      <Dialog open={isAddStreamDialogOpen} onOpenChange={setIsAddStreamDialogOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Add Revenue Stream</DialogTitle>
+            <DialogDescription>
+              Add a new revenue stream to your forecast.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleAddRevenueStream}>
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="name" className="text-right">
+                  Name
+                </Label>
+                <Input id="name" name="name" className="col-span-3" />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="type" className="text-right">
+                  Type
+                </Label>
+                <Select name="type" defaultValue="subscription">
+                  <SelectTrigger className="col-span-3">
+                    <SelectValue placeholder="Select type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="subscription">Subscription</SelectItem>
+                    <SelectItem value="one-time">One-time</SelectItem>
+                    <SelectItem value="service">Service</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="amount" className="text-right">
+                  Amount
+                </Label>
+                <div className="col-span-3 flex">
+                  <span className="inline-flex items-center px-3 rounded-l-md border border-r-0 border-gray-300 bg-gray-50 text-gray-500 sm:text-sm">
+                    $
+                  </span>
+                  <Input
+                    id="amount"
+                    name="amount"
+                    type="number"
+                    className="rounded-l-none"
+                    min="0"
+                    step="1000"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="frequency" className="text-right">
+                  Frequency
+                </Label>
+                <Select name="frequency" defaultValue="annual">
+                  <SelectTrigger className="col-span-3">
+                    <SelectValue placeholder="Select frequency" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="monthly">Monthly</SelectItem>
+                    <SelectItem value="quarterly">Quarterly</SelectItem>
+                    <SelectItem value="annual">Annual</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="growthRate" className="text-right">
+                  Growth Rate
+                </Label>
+                <div className="col-span-3 flex">
+                  <Input
+                    id="growthRate"
+                    name="growthRate"
+                    type="number"
+                    step="0.001"
+                    min="-0.5"
+                    max="1"
+                    className="rounded-r-none"
+                  />
+                  <span className="inline-flex items-center px-3 rounded-r-md border border-l-0 border-gray-300 bg-gray-50 text-gray-500 sm:text-sm">
+                    %
+                  </span>
+                </div>
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="category" className="text-right">
+                  Category
+                </Label>
+                <Input id="category" name="category" className="col-span-3" />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setIsAddStreamDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={addRevenueStreamMutation.isPending}>
+                {addRevenueStreamMutation.isPending ? "Adding..." : "Add Stream"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Revenue Driver Dialog */}
+      <Dialog open={isAddDriverDialogOpen} onOpenChange={setIsAddDriverDialogOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Add Revenue Driver</DialogTitle>
+            <DialogDescription>
+              Add a new revenue driver metric to your forecast.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleAddRevenueDriver}>
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="name" className="text-right">
+                  Name
+                </Label>
+                <Input id="name" name="name" className="col-span-3" />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="value" className="text-right">
+                  Current Value
+                </Label>
+                <Input
+                  id="value"
+                  name="value"
+                  type="number"
+                  className="col-span-3"
+                  min="0"
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="unit" className="text-right">
+                  Unit
+                </Label>
+                <Input id="unit" name="unit" className="col-span-3" placeholder="e.g., users, %" />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="minValue" className="text-right">
+                  Min Value
+                </Label>
+                <Input
+                  id="minValue"
+                  name="minValue"
+                  type="number"
+                  className="col-span-3"
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="maxValue" className="text-right">
+                  Max Value
+                </Label>
+                <Input
+                  id="maxValue"
+                  name="maxValue"
+                  type="number"
+                  className="col-span-3"
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="growthRate" className="text-right">
+                  Growth Rate
+                </Label>
+                <div className="col-span-3 flex">
+                  <Input
+                    id="growthRate"
+                    name="growthRate"
+                    type="number"
+                    step="0.001"
+                    min="-0.5"
+                    max="1"
+                    className="rounded-r-none"
+                  />
+                  <span className="inline-flex items-center px-3 rounded-r-md border border-l-0 border-gray-300 bg-gray-50 text-gray-500 sm:text-sm">
+                    %
+                  </span>
+                </div>
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="category" className="text-right">
+                  Category
+                </Label>
+                <Select name="category" defaultValue="usage">
+                  <SelectTrigger className="col-span-3">
+                    <SelectValue placeholder="Select category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="usage">Usage</SelectItem>
+                    <SelectItem value="conversion">Conversion</SelectItem>
+                    <SelectItem value="monetization">Monetization</SelectItem>
+                    <SelectItem value="retention">Retention</SelectItem>
+                    <SelectItem value="other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setIsAddDriverDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={addRevenueDriverMutation.isPending}>
+                {addRevenueDriverMutation.isPending ? "Adding..." : "Add Driver"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 };
 

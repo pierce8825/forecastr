@@ -1,126 +1,239 @@
-import React from "react";
-import { Card, CardContent } from "@/components/ui/card";
-import { MaterialIcon } from "../ui/ui-icons";
+import { useState } from "react";
 import { 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
-  ResponsiveContainer,
+  Card, 
+  CardHeader, 
+  CardTitle, 
+  CardDescription, 
+  CardContent 
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { MoreHorizontal } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
   Legend,
+  ResponsiveContainer,
 } from "recharts";
-
-export interface RevenueChartData {
-  month: string;
-  actual: number;
-  projected: number;
-}
+import { useQuery } from "@tanstack/react-query";
 
 interface RevenueChartProps {
-  data: RevenueChartData[];
-  isLoading?: boolean;
-  onFilter?: () => void;
-  onMoreOptions?: () => void;
+  forecastId?: number;
+  revenueStreams?: any[];
+  isLoading: boolean;
 }
 
-export const RevenueChart: React.FC<RevenueChartProps> = ({ 
-  data, 
-  isLoading = false,
-  onFilter,
-  onMoreOptions,
-}) => {
-  // Format numbers for tooltip
-  const formatCurrency = (value: number) => {
-    return `$${value.toLocaleString()}`;
-  };
+const RevenueChart = ({ forecastId, revenueStreams, isLoading }: RevenueChartProps) => {
+  const [timeFrame, setTimeFrame] = useState("quarterly");
+
+  // If revenueStreams are not provided, fetch them
+  const { data: fetchedRevenueStreams } = useQuery({
+    queryKey: ["/api/revenue-streams", { forecastId }],
+    queryFn: async () => {
+      if (!forecastId) throw new Error("No forecast selected");
+      const res = await fetch(`/api/revenue-streams?forecastId=${forecastId}`);
+      if (!res.ok) throw new Error("Failed to fetch revenue streams");
+      return res.json();
+    },
+    enabled: !!forecastId && !revenueStreams,
+  });
+
+  const streams = revenueStreams || fetchedRevenueStreams || [];
+  
+  // Chart data for different time frames
+  const monthlyData = Array.from({ length: 12 }, (_, i) => {
+    const month = new Date(2023, i, 1).toLocaleString('default', { month: 'short' });
+    const result = { name: month };
+    
+    streams.forEach(stream => {
+      const baseAmount = Number(stream.amount) / (stream.frequency === 'annual' ? 12 : stream.frequency === 'quarterly' ? 3 : 1);
+      const growthFactor = 1 + Number(stream.growthRate || 0) / 12 * i;
+      result[stream.name] = Math.round(baseAmount * growthFactor);
+      result[`${stream.name}Color`] = stream.name === 'Subscription Revenue' ? '#3B82F6' : 
+                                      stream.name === 'Service Revenue' ? '#10B981' : '#8B5CF6';
+    });
+    
+    return result;
+  });
+
+  const quarterlyData = Array.from({ length: 4 }, (_, i) => {
+    const quarter = `Q${i + 1}`;
+    const result = { name: quarter };
+    
+    streams.forEach(stream => {
+      const baseAmount = Number(stream.amount) / (stream.frequency === 'annual' ? 4 : stream.frequency === 'quarterly' ? 1 : 3);
+      const growthFactor = 1 + Number(stream.growthRate || 0) / 4 * i;
+      result[stream.name] = Math.round(baseAmount * growthFactor);
+      result[`${stream.name}Color`] = stream.name === 'Subscription Revenue' ? '#3B82F6' : 
+                                      stream.name === 'Service Revenue' ? '#10B981' : '#8B5CF6';
+    });
+    
+    return result;
+  });
+
+  const yearlyData = Array.from({ length: 3 }, (_, i) => {
+    const year = `${2023 + i}`;
+    const result = { name: year };
+    
+    streams.forEach(stream => {
+      const baseAmount = Number(stream.amount);
+      const growthFactor = Math.pow(1 + Number(stream.growthRate || 0), i);
+      result[stream.name] = Math.round(baseAmount * growthFactor);
+      result[`${stream.name}Color`] = stream.name === 'Subscription Revenue' ? '#3B82F6' : 
+                                      stream.name === 'Service Revenue' ? '#10B981' : '#8B5CF6';
+    });
+    
+    return result;
+  });
+  
+  const chartData = timeFrame === 'monthly' ? monthlyData : 
+                    timeFrame === 'quarterly' ? quarterlyData : yearlyData;
+
+  // Get data for revenue breakdown
+  const subscriptionRevenue = streams.find(s => s.name === 'Subscription Revenue')?.amount || 0;
+  const serviceRevenue = streams.find(s => s.name === 'Service Revenue')?.amount || 0;
+  const oneTimeRevenue = streams.find(s => s.name === 'One-time Sales')?.amount || 0;
 
   if (isLoading) {
     return (
-      <Card className="bg-white rounded-lg shadow-sm p-5 border border-neutral-light">
-        <CardContent className="p-0">
-          <div className="flex justify-between items-center mb-6">
-            <h3 className="font-medium text-neutral-darker">Revenue Forecast</h3>
-            <div className="flex space-x-2">
-              <button className="text-neutral-dark hover:text-primary p-1">
-                <MaterialIcon name="filter_list" />
-              </button>
-              <button className="text-neutral-dark hover:text-primary p-1">
-                <MaterialIcon name="more_horiz" />
-              </button>
+      <div className="mb-4">
+        <div className="mb-4 flex flex-wrap items-center justify-between">
+          <Skeleton className="h-8 w-56" />
+          <div className="flex items-center space-x-2 mt-2 sm:mt-0">
+            <Skeleton className="h-8 w-24" />
+            <Skeleton className="h-8 w-24" />
+            <Skeleton className="h-8 w-24" />
+            <Skeleton className="h-8 w-8" />
+          </div>
+        </div>
+        
+        <Card>
+          <CardContent className="p-4">
+            <Skeleton className="h-64 w-full mb-4" />
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <Skeleton className="h-24" />
+              <Skeleton className="h-24" />
+              <Skeleton className="h-24" />
             </div>
-          </div>
-          <div className="chart-container animate-pulse">
-            <div className="h-64 bg-neutral-lighter rounded"></div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      </div>
     );
   }
 
   return (
-    <Card className="bg-white rounded-lg shadow-sm p-5 border border-neutral-light">
-      <CardContent className="p-0">
-        <div className="flex justify-between items-center mb-6">
-          <h3 className="font-medium text-neutral-darker">Revenue Forecast</h3>
-          <div className="flex space-x-2">
-            <button 
-              onClick={onFilter}
-              className="text-neutral-dark hover:text-primary p-1"
-            >
-              <MaterialIcon name="filter_list" />
-            </button>
-            <button 
-              onClick={onMoreOptions}
-              className="text-neutral-dark hover:text-primary p-1"
-            >
-              <MaterialIcon name="more_horiz" />
-            </button>
+    <div className="mb-4">
+      <div className="mb-4 flex flex-wrap items-center justify-between">
+        <h2 className="text-lg font-semibold text-gray-800">Revenue Forecast</h2>
+        <div className="flex items-center space-x-2 mt-2 sm:mt-0">
+          <Button 
+            variant={timeFrame === "monthly" ? "default" : "outline"} 
+            onClick={() => setTimeFrame("monthly")}
+          >
+            Monthly
+          </Button>
+          <Button 
+            variant={timeFrame === "quarterly" ? "default" : "outline"} 
+            onClick={() => setTimeFrame("quarterly")}
+          >
+            Quarterly
+          </Button>
+          <Button 
+            variant={timeFrame === "yearly" ? "default" : "outline"} 
+            onClick={() => setTimeFrame("yearly")}
+          >
+            Yearly
+          </Button>
+          <Button variant="outline" size="icon">
+            <MoreHorizontal className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+      
+      <Card>
+        <CardContent className="p-4">
+          {/* Chart Container */}
+          <div className="w-full h-64 mb-4">
+            {streams.length === 0 ? (
+              <div className="bg-gray-50 border border-dashed border-gray-300 rounded-lg w-full h-full flex items-center justify-center">
+                <div className="text-center">
+                  <p className="text-gray-500 mb-1">No revenue streams available</p>
+                  <p className="text-xs text-gray-400">Add revenue streams to visualize your forecast</p>
+                </div>
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={chartData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="name" />
+                  <YAxis tickFormatter={(value) => `$${value >= 1000 ? `${(value / 1000).toFixed(0)}k` : value}`} />
+                  <Tooltip formatter={(value) => [`$${Number(value).toLocaleString()}`, ""]} />
+                  <Legend />
+                  {streams.map((stream) => (
+                    <Bar 
+                      key={stream.id} 
+                      dataKey={stream.name} 
+                      name={stream.name} 
+                      stackId="a" 
+                      fill={stream.name === 'Subscription Revenue' ? '#3B82F6' : 
+                            stream.name === 'Service Revenue' ? '#10B981' : '#8B5CF6'} 
+                    />
+                  ))}
+                </BarChart>
+              </ResponsiveContainer>
+            )}
           </div>
-        </div>
-        <div className="chart-container">
-          <ResponsiveContainer width="100%" height={250}>
-            <BarChart
-              data={data}
-              margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-              barGap={2}
-            >
-              <CartesianGrid strokeDasharray="3 3" vertical={false} />
-              <XAxis dataKey="month" fontSize={12} />
-              <YAxis 
-                tickFormatter={(value) => `$${value/1000}k`} 
-                fontSize={12}
-              />
-              <Tooltip 
-                formatter={(value: number) => formatCurrency(value)} 
-                labelStyle={{ color: '#323130', fontWeight: 600 }}
-                contentStyle={{ 
-                  backgroundColor: 'white', 
-                  border: '1px solid #EDEBE9',
-                  borderRadius: '4px'
-                }}
-              />
-              <Legend 
-                formatter={(value) => <span style={{ color: '#605E5C', fontSize: 12 }}>{value}</span>}
-                align="center"
-              />
-              <Bar 
-                dataKey="actual" 
-                name="Actual" 
-                fill="#0078D4" 
-                radius={[2, 2, 0, 0]} 
-              />
-              <Bar 
-                dataKey="projected" 
-                name="Projected" 
-                fill="#EDEBE9" 
-                radius={[2, 2, 0, 0]} 
-              />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      </CardContent>
-    </Card>
+          
+          {/* Revenue Breakdown */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="border-l-4 border-blue-500 pl-3">
+              <p className="text-sm text-gray-600">Subscription Revenue</p>
+              <p className="text-lg font-semibold font-tabular text-gray-800">
+                ${Number(subscriptionRevenue).toLocaleString()}
+              </p>
+              <div className="flex items-center mt-1">
+                <span className="text-xs font-medium text-green-600 mr-1">
+                  ↑ 18.2%
+                </span>
+                <span className="text-xs text-gray-500">vs last year</span>
+              </div>
+            </div>
+            
+            <div className="border-l-4 border-green-500 pl-3">
+              <p className="text-sm text-gray-600">Service Revenue</p>
+              <p className="text-lg font-semibold font-tabular text-gray-800">
+                ${Number(serviceRevenue).toLocaleString()}
+              </p>
+              <div className="flex items-center mt-1">
+                <span className="text-xs font-medium text-green-600 mr-1">
+                  ↑ 5.7%
+                </span>
+                <span className="text-xs text-gray-500">vs last year</span>
+              </div>
+            </div>
+            
+            <div className="border-l-4 border-purple-500 pl-3">
+              <p className="text-sm text-gray-600">One-time Sales</p>
+              <p className="text-lg font-semibold font-tabular text-gray-800">
+                ${Number(oneTimeRevenue).toLocaleString()}
+              </p>
+              <div className="flex items-center mt-1">
+                <span className="text-xs font-medium text-red-600 mr-1">
+                  ↓ 2.3%
+                </span>
+                <span className="text-xs text-gray-500">vs last year</span>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
   );
 };
+
+export default RevenueChart;

@@ -1,15 +1,20 @@
-import React, { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { useToast } from "@/hooks/use-toast";
-import { Header, ToolbarHeader } from "@/components/layout/header";
-import { Sidebar } from "@/components/layout/sidebar";
-import { Card, CardContent } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { 
+  Card, 
+  CardHeader, 
+  CardTitle, 
+  CardDescription, 
+  CardContent 
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ExpensesTable, ExpenseCategoryData } from "@/components/dashboard/expenses-table";
-import { MaterialIcon } from "@/components/ui/ui-icons";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { apiRequest } from "@/lib/queryClient";
 import { 
+  PieChart, 
+  Pie, 
+  Cell, 
   LineChart, 
   Line, 
   XAxis, 
@@ -17,489 +22,518 @@ import {
   CartesianGrid, 
   Tooltip, 
   Legend, 
-  ResponsiveContainer 
+  ResponsiveContainer,
+  BarChart,
+  Bar
 } from "recharts";
 import { 
-  Dialog, 
-  DialogContent, 
-  DialogDescription, 
-  DialogFooter, 
-  DialogHeader, 
-  DialogTitle, 
-  DialogTrigger,
+  Plus, 
+  Edit2, 
+  Trash2, 
+  DollarSign,
+  Filter
+} from "lucide-react";
+import { Helmet } from "react-helmet";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { useFinancialContext } from "@/contexts/financial-context";
+import { useToast } from "@/hooks/use-toast";
+import { Checkbox } from "@/components/ui/checkbox";
 
-const Expenses: React.FC = () => {
+const Expenses = () => {
+  const [activeTab, setActiveTab] = useState("all");
+  const [isAddExpenseDialogOpen, setIsAddExpenseDialogOpen] = useState(false);
+  const queryClient = useQueryClient();
   const { toast } = useToast();
-  const { activeWorkspace, scenarios, setActiveScenario, activePeriod, setActivePeriod } = useFinancialContext();
-
-  // Current user
-  const [user] = useState({
-    id: 1,
-    fullName: "John Smith",
-    initials: "JS"
+  
+  // Demo user ID for MVP
+  const userId = 1;
+  
+  // Get the active forecast
+  const { data: forecasts } = useQuery({
+    queryKey: ["/api/forecasts", { userId }],
+    queryFn: async () => {
+      const res = await fetch(`/api/forecasts?userId=${userId}`);
+      if (!res.ok) throw new Error("Failed to fetch forecasts");
+      return res.json();
+    },
   });
 
-  // Active tab state
-  const [activeTab, setActiveTab] = useState("overview");
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [editingCategory, setEditingCategory] = useState<string | null>(null);
+  const activeForecast = forecasts?.[0];
+  const forecastId = activeForecast?.id;
 
-  // Fetch data
-  const { data: expensesData, isLoading: isLoadingExpenses } = useQuery({
-    queryKey: ['/api/workspaces/1/expense-categories'],
-    enabled: !!activeWorkspace
+  // Fetch expenses
+  const { data: expenses, isLoading: isLoadingExpenses } = useQuery({
+    queryKey: ["/api/expenses", { forecastId }],
+    queryFn: async () => {
+      if (!forecastId) throw new Error("No forecast selected");
+      const res = await fetch(`/api/expenses?forecastId=${forecastId}`);
+      if (!res.ok) throw new Error("Failed to fetch expenses");
+      return res.json();
+    },
+    enabled: !!forecastId,
   });
 
-  const { data: expenseTrendsData, isLoading: isLoadingTrends } = useQuery({
-    queryKey: ['/api/workspaces/1/expense-trends'],
-    enabled: !!activeWorkspace
+  // Mutations for expenses
+  const addExpenseMutation = useMutation({
+    mutationFn: async (newExpense) => {
+      return await apiRequest("POST", "/api/expenses", newExpense);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/expenses"] });
+      setIsAddExpenseDialogOpen(false);
+      toast({
+        title: "Expense added",
+        description: "New expense has been added successfully",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: `Failed to add expense: ${error.message}`,
+        variant: "destructive",
+      });
+    },
   });
 
-  // Mock data for demonstration - in a real app, this would come from the API
-  const expenseCategories: ExpenseCategoryData[] = [
-    {
-      id: "personnel",
-      name: "Personnel",
-      currentMonth: 32500,
-      ytd: 156000,
-      percentOfRevenue: 40.1
-    },
-    {
-      id: "marketing",
-      name: "Marketing",
-      currentMonth: 15800,
-      ytd: 72300,
-      percentOfRevenue: 19.5
-    },
-    {
-      id: "software",
-      name: "Software & Tools",
-      currentMonth: 4200,
-      ytd: 19600,
-      percentOfRevenue: 5.2
-    },
-    {
-      id: "office",
-      name: "Office & Operations",
-      currentMonth: 5500,
-      ytd: 27000,
-      percentOfRevenue: 6.8
-    }
-  ];
-
-  const expenseTrends = [
-    { month: "Jan", personnel: 28000, marketing: 12000, software: 3800, office: 5000 },
-    { month: "Feb", personnel: 28500, marketing: 13200, software: 3900, office: 5100 },
-    { month: "Mar", personnel: 29000, marketing: 14500, software: 4000, office: 5200 },
-    { month: "Apr", personnel: 30000, marketing: 15000, software: 4100, office: 5300 },
-    { month: "May", personnel: 32000, marketing: 15500, software: 4200, office: 5400 },
-    { month: "Jun", personnel: 32500, marketing: 15800, software: 4200, office: 5500 }
-  ];
-
-  // Event handlers
-  const handleAddExpenseCategory = () => {
-    setEditingCategory(null);
-    setIsDialogOpen(true);
-  };
-
-  const handleEditExpenseCategory = (id: string) => {
-    setEditingCategory(id);
-    setIsDialogOpen(true);
-  };
-
-  const handleSaveExpenseCategory = () => {
-    toast({
-      title: editingCategory ? "Category Updated" : "Category Added",
-      description: editingCategory ? `Updated expense category ${editingCategory}` : "New expense category added",
+  // Form handlers
+  const handleAddExpense = (e) => {
+    e.preventDefault();
+    const formData = new FormData(e.target);
+    
+    addExpenseMutation.mutate({
+      forecastId,
+      name: formData.get("name"),
+      amount: formData.get("amount"),
+      frequency: formData.get("frequency"),
+      category: formData.get("category"),
+      isCogsRelated: formData.get("isCogsRelated") === "on",
     });
-    setIsDialogOpen(false);
   };
 
-  // Format currency
-  const formatCurrency = (value: number) => {
-    return `$${value.toLocaleString()}`;
-  };
+  // Filter expenses by category
+  const filteredExpenses = activeTab === "all" 
+    ? expenses 
+    : expenses?.filter(expense => expense.category === activeTab);
+
+  // Process expenses by category for chart
+  const expensesByCategory = expenses?.reduce((acc, expense) => {
+    const category = expense.category || "Other";
+    const amount = Number(expense.amount);
+    
+    if (!acc[category]) {
+      acc[category] = {
+        name: category,
+        value: 0,
+        color: category === 'Marketing' ? '#3B82F6' : 
+               category === 'Software' ? '#10B981' : 
+               category === 'Office' ? '#F59E0B' : 
+               category === 'Other' ? '#EF4444' : '#8B5CF6'
+      };
+    }
+    
+    acc[category].value += amount;
+    return acc;
+  }, {}) || {};
+  
+  // Convert to array and sort by value
+  const expenseCategories = Object.values(expensesByCategory)
+    .sort((a, b) => b.value - a.value);
+  
+  // Calculate total
+  const totalExpenses = expenseCategories.reduce((sum, cat) => sum + cat.value, 0);
+
+  // Create expense trend data (monthly projection)
+  const expenseTrendData = Array.from({ length: 12 }, (_, i) => {
+    const month = new Date(2023, i, 1).toLocaleString('default', { month: 'short' });
+    const result = { name: month };
+    
+    // Initialize with zero values for each category
+    expenseCategories.forEach(category => {
+      result[category.name] = 0;
+    });
+    
+    // Calculate monthly expenses
+    expenses?.forEach(expense => {
+      if (expense.frequency === 'monthly') {
+        result[expense.category || "Other"] += Number(expense.amount);
+      } else if (expense.frequency === 'quarterly' && i % 3 === 0) {
+        result[expense.category || "Other"] += Number(expense.amount) / 3;
+      } else if (expense.frequency === 'annual' && i === 0) {
+        result[expense.category || "Other"] += Number(expense.amount) / 12;
+      } else if (expense.frequency === 'one-time' && i === 0) {
+        result[expense.category || "Other"] += Number(expense.amount);
+      }
+    });
+    
+    return result;
+  });
+
+  const isLoading = isLoadingExpenses;
 
   return (
-    <div className="h-screen flex flex-col overflow-hidden">
-      <Header user={user} />
-      
-      <div className="flex flex-1 overflow-hidden">
-        <Sidebar 
-          activeWorkspace={activeWorkspace}
-        />
+    <>
+      <Helmet>
+        <title>Expense Management | FinanceForge</title>
+        <meta name="description" content="Track, categorize, and forecast your business expenses to optimize spending and improve financial planning." />
+      </Helmet>
 
-        <main className="flex-1 overflow-y-auto bg-neutral-lighter">
-          <ToolbarHeader 
-            title="Expense Management"
-            onEdit={() => toast({ title: "Edit Expense Settings", description: "Opening expense settings" })}
-            scenarios={scenarios.map(s => ({ id: s.id, name: s.name }))}
-            activeScenario={scenarios.find(s => s.isActive)?.id}
-            onScenarioChange={setActiveScenario}
-            period={activePeriod}
-            onPeriodChange={setActivePeriod}
-          />
+      <div className="p-6">
+        <div className="flex justify-between items-center mb-6">
+          <div>
+            <h1 className="text-2xl font-bold">Expense Management</h1>
+            <p className="text-muted-foreground">Track and manage your business expenses</p>
+          </div>
+          <div className="flex gap-2">
+            <Button onClick={() => setIsAddExpenseDialogOpen(true)}>
+              <Plus className="mr-2 h-4 w-4" /> Add Expense
+            </Button>
+          </div>
+        </div>
 
-          <div className="p-6 max-w-7xl mx-auto">
-            <Tabs defaultValue="overview" className="mb-8" onValueChange={setActiveTab}>
-              <TabsList className="grid grid-cols-3 w-full max-w-md mb-6">
-                <TabsTrigger value="overview">Overview</TabsTrigger>
-                <TabsTrigger value="categories">Categories</TabsTrigger>
-                <TabsTrigger value="forecasting">Forecasting</TabsTrigger>
-              </TabsList>
-              
-              <TabsContent value="overview" className="space-y-8">
-                <Card className="bg-white rounded-lg shadow-sm p-5 border border-neutral-light">
-                  <CardContent className="p-0">
-                    <div className="flex justify-between items-center mb-6">
-                      <h3 className="font-medium text-neutral-darker">Expense Trends</h3>
-                      <div className="flex space-x-2">
-                        <button className="text-neutral-dark hover:text-primary p-1">
-                          <MaterialIcon name="filter_list" />
-                        </button>
-                        <button className="text-neutral-dark hover:text-primary p-1">
-                          <MaterialIcon name="more_horiz" />
-                        </button>
-                      </div>
-                    </div>
-                    
-                    <div className="chart-container" style={{ height: "350px" }}>
-                      {isLoadingTrends ? (
-                        <div className="h-full w-full bg-neutral-lighter rounded animate-pulse"></div>
-                      ) : (
-                        <ResponsiveContainer width="100%" height="100%">
-                          <LineChart
-                            data={expenseTrendsData?.data || expenseTrends}
-                            margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-                          >
-                            <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                            <XAxis dataKey="month" />
-                            <YAxis tickFormatter={(value) => `$${value/1000}k`} />
-                            <Tooltip formatter={(value) => formatCurrency(value as number)} />
-                            <Legend />
-                            <Line 
-                              type="monotone" 
-                              dataKey="personnel" 
-                              name="Personnel" 
-                              stroke="#0078D4" 
-                              activeDot={{ r: 8 }} 
-                            />
-                            <Line 
-                              type="monotone" 
-                              dataKey="marketing" 
-                              name="Marketing" 
-                              stroke="#50E6FF" 
-                            />
-                            <Line 
-                              type="monotone" 
-                              dataKey="software" 
-                              name="Software & Tools" 
-                              stroke="#107C10" 
-                            />
-                            <Line 
-                              type="monotone" 
-                              dataKey="office" 
-                              name="Office & Operations" 
-                              stroke="#D83B01" 
-                            />
-                          </LineChart>
-                        </ResponsiveContainer>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-                
-                <ExpensesTable 
-                  categories={expensesData?.categories || expenseCategories}
-                  isLoading={isLoadingExpenses}
-                  onAddCategory={handleAddExpenseCategory}
-                  onEditCategory={handleEditExpenseCategory}
-                  onMoreOptions={() => toast({ title: "More Options", description: "Expense category options" })}
-                />
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg">Total Monthly Expenses</CardTitle>
+              <CardDescription>All categories combined</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold text-gray-900 font-tabular">
+                ${totalExpenses.toLocaleString()}
+              </div>
+              <p className="text-sm text-muted-foreground mt-1">
+                {expenses?.length || 0} expense items tracked
+              </p>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg">COGS Related</CardTitle>
+              <CardDescription>Direct cost of goods sold</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold text-gray-900 font-tabular">
+                ${expenses?.filter(e => e.isCogsRelated)
+                          .reduce((sum, e) => sum + Number(e.amount), 0)
+                          .toLocaleString() || "0"}
+              </div>
+              <p className="text-sm text-muted-foreground mt-1">
+                {expenses?.filter(e => e.isCogsRelated).length || 0} expense items
+              </p>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg">Largest Category</CardTitle>
+              <CardDescription>Highest spending area</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold text-gray-900 font-tabular">
+                {expenseCategories[0]?.name || "N/A"}
+              </div>
+              <p className="text-sm text-muted-foreground mt-1">
+                ${expenseCategories[0]?.value.toLocaleString() || "0"} 
+                ({expenseCategories[0] 
+                  ? Math.round((expenseCategories[0].value / totalExpenses) * 100) 
+                  : 0}% of total)
+              </p>
+            </CardContent>
+          </Card>
+        </div>
 
-                <Card className="bg-white rounded-lg shadow-sm p-5 border border-neutral-light">
-                  <CardContent className="p-0">
-                    <h3 className="font-medium text-neutral-darker mb-6">Expense Summary</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                      <div className="bg-neutral-lighter p-4 rounded-md">
-                        <h4 className="text-sm font-medium text-neutral-dark mb-2">Total Expenses YTD</h4>
-                        <div className="text-2xl font-semibold text-neutral-darker">$274,900</div>
-                        <div className="text-sm text-warning mt-1">+9.8% year-over-year</div>
-                      </div>
-                      <div className="bg-neutral-lighter p-4 rounded-md">
-                        <h4 className="text-sm font-medium text-neutral-dark mb-2">Average Monthly Burn</h4>
-                        <div className="text-2xl font-semibold text-neutral-darker">$45,816</div>
-                        <div className="text-sm text-warning mt-1">+3.5% vs. last quarter</div>
-                      </div>
-                      <div className="bg-neutral-lighter p-4 rounded-md">
-                        <h4 className="text-sm font-medium text-neutral-dark mb-2">Expenses as % of Revenue</h4>
-                        <div className="text-2xl font-semibold text-neutral-darker">71.6%</div>
-                        <div className="text-sm text-success mt-1">-2.3% vs. target</div>
-                      </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Expense Breakdown</CardTitle>
+              <CardDescription>Distribution by category</CardDescription>
+            </CardHeader>
+            <CardContent className="pt-0">
+              <div className="h-64">
+                {isLoading ? (
+                  <div className="h-full flex items-center justify-center">
+                    <p>Loading expense data...</p>
+                  </div>
+                ) : expenseCategories.length === 0 ? (
+                  <div className="h-full flex items-center justify-center text-center">
+                    <div>
+                      <p className="text-muted-foreground mb-2">No expense data available</p>
+                      <Button size="sm" onClick={() => setIsAddExpenseDialogOpen(true)}>
+                        <Plus className="mr-2 h-4 w-4" /> Add Your First Expense
+                      </Button>
                     </div>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-              
-              <TabsContent value="categories" className="space-y-4">
-                <div className="flex justify-between items-center mb-4">
-                  <h3 className="text-lg font-medium text-neutral-darker">Expense Categories</h3>
-                  <Button onClick={handleAddExpenseCategory}>
-                    <MaterialIcon name="add_circle" className="mr-2" />
-                    Add Category
-                  </Button>
-                </div>
-                
-                {isLoadingExpenses ? (
-                  <div className="space-y-4 animate-pulse">
-                    {[1, 2, 3, 4].map((i) => (
-                      <div key={i} className="h-32 bg-white rounded-lg shadow-sm border border-neutral-light"></div>
-                    ))}
                   </div>
                 ) : (
-                  <div className="space-y-4">
-                    {expenseCategories.map((category) => (
-                      <Card key={category.id} className="bg-white shadow-sm border border-neutral-light">
-                        <CardContent className="p-4">
-                          <div className="flex flex-col md:flex-row justify-between">
-                            <div>
-                              <h4 className="font-medium text-neutral-darker mb-2">{category.name}</h4>
-                              <p className="text-sm text-neutral-dark mb-4">
-                                {category.id === "personnel" 
-                                  ? "Salaries, benefits, and taxes for all employees" 
-                                  : category.id === "marketing"
-                                  ? "Advertising, promotions, and marketing campaigns"
-                                  : category.id === "software"
-                                  ? "SaaS subscriptions and software licenses"
-                                  : "Office rent, utilities, and operations"}
-                              </p>
-                              <div className="flex space-x-6">
-                                <div>
-                                  <div className="text-xs text-neutral-dark">Current Month</div>
-                                  <div className="text-lg font-medium text-neutral-darker">
-                                    ${category.currentMonth.toLocaleString()}
-                                  </div>
-                                </div>
-                                <div>
-                                  <div className="text-xs text-neutral-dark">YTD</div>
-                                  <div className="text-lg font-medium text-neutral-darker">
-                                    ${category.ytd.toLocaleString()}
-                                  </div>
-                                </div>
-                                <div>
-                                  <div className="text-xs text-neutral-dark">% of Revenue</div>
-                                  <div className="text-lg font-medium text-neutral-darker">
-                                    {category.percentOfRevenue.toFixed(1)}%
-                                  </div>
-                                </div>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={expenseCategories}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={60}
+                        outerRadius={90}
+                        fill="#8884d8"
+                        paddingAngle={5}
+                        dataKey="value"
+                        label={({ name, percent }) => 
+                          `${name}: ${(percent * 100).toFixed(0)}%`
+                        }
+                      >
+                        {expenseCategories.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip formatter={(value) => `$${Number(value).toLocaleString()}`} />
+                      <Legend />
+                    </PieChart>
+                  </ResponsiveContainer>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardHeader>
+              <CardTitle>Monthly Expense Trend</CardTitle>
+              <CardDescription>Projected expenses over time</CardDescription>
+            </CardHeader>
+            <CardContent className="pt-0">
+              <div className="h-64">
+                {isLoading ? (
+                  <div className="h-full flex items-center justify-center">
+                    <p>Loading expense data...</p>
+                  </div>
+                ) : expenses?.length === 0 ? (
+                  <div className="h-full flex items-center justify-center text-center">
+                    <div>
+                      <p className="text-muted-foreground mb-2">No expense data available</p>
+                      <Button size="sm" onClick={() => setIsAddExpenseDialogOpen(true)}>
+                        <Plus className="mr-2 h-4 w-4" /> Add Your First Expense
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={expenseTrendData}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="name" />
+                      <YAxis tickFormatter={(value) => `$${value >= 1000 ? `${(value / 1000).toFixed(0)}k` : value}`} />
+                      <Tooltip 
+                        formatter={(value) => `$${Number(value).toLocaleString()}`} 
+                      />
+                      <Legend />
+                      {expenseCategories.map((category, index) => (
+                        <Line
+                          key={index}
+                          type="monotone"
+                          dataKey={category.name}
+                          stroke={category.color}
+                          activeDot={{ r: 8 }}
+                        />
+                      ))}
+                    </LineChart>
+                  </ResponsiveContainer>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle>Expense List</CardTitle>
+              <CardDescription>
+                Manage your expense items
+              </CardDescription>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Button variant="outline" size="sm">
+                <Filter className="mr-2 h-4 w-4" />
+                Filter
+              </Button>
+              <Button size="sm" onClick={() => setIsAddExpenseDialogOpen(true)}>
+                <Plus className="mr-2 h-4 w-4" />
+                Add
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+              <TabsList className="mb-4 w-full justify-start overflow-x-auto">
+                <TabsTrigger value="all">All Categories</TabsTrigger>
+                {expenseCategories.map((category, index) => (
+                  <TabsTrigger key={index} value={category.name} className="min-w-[100px]">
+                    {category.name}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+              
+              <TabsContent value={activeTab}>
+                {isLoading ? (
+                  <div className="h-40 flex items-center justify-center">
+                    <p>Loading expenses...</p>
+                  </div>
+                ) : filteredExpenses?.length === 0 ? (
+                  <div className="text-center py-8">
+                    <p className="text-muted-foreground mb-4">No expenses found for this category</p>
+                    <Button onClick={() => setIsAddExpenseDialogOpen(true)}>
+                      <Plus className="mr-2 h-4 w-4" /> Add Expense
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="border-b">
+                          <th className="py-3 px-2 text-left">Name</th>
+                          <th className="py-3 px-2 text-left">Category</th>
+                          <th className="py-3 px-2 text-right">Amount</th>
+                          <th className="py-3 px-2 text-right">Frequency</th>
+                          <th className="py-3 px-2 text-center">COGS</th>
+                          <th className="py-3 px-2 text-right">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredExpenses?.map((expense) => (
+                          <tr key={expense.id} className="border-b hover:bg-gray-50">
+                            <td className="py-3 px-2">{expense.name}</td>
+                            <td className="py-3 px-2">{expense.category || "Uncategorized"}</td>
+                            <td className="py-3 px-2 text-right font-tabular">
+                              ${Number(expense.amount).toLocaleString()}
+                            </td>
+                            <td className="py-3 px-2 text-right">
+                              {expense.frequency.charAt(0).toUpperCase() + expense.frequency.slice(1)}
+                            </td>
+                            <td className="py-3 px-2 text-center">
+                              {expense.isCogsRelated ? "Yes" : "No"}
+                            </td>
+                            <td className="py-3 px-2 text-right">
+                              <div className="flex justify-end gap-2">
+                                <Button variant="ghost" size="icon">
+                                  <Edit2 className="h-4 w-4" />
+                                </Button>
+                                <Button variant="ghost" size="icon">
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
                               </div>
-                            </div>
-                            <div className="flex items-center space-x-3 mt-4 md:mt-0">
-                              <Button 
-                                variant="outline" 
-                                size="sm" 
-                                onClick={() => handleEditExpenseCategory(category.id)}
-                              >
-                                Edit
-                              </Button>
-                              <Button 
-                                variant="outline" 
-                                size="sm" 
-                                onClick={() => toast({ title: "View Details", description: `Viewing details for ${category.name}` })}
-                              >
-                                Details
-                              </Button>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
                 )}
               </TabsContent>
-              
-              <TabsContent value="forecasting" className="space-y-4">
-                <div className="flex justify-between items-center mb-4">
-                  <h3 className="text-lg font-medium text-neutral-darker">Expense Forecasting</h3>
-                  <Button onClick={() => toast({ title: "Run Forecast", description: "Generating expense forecast" })}>
-                    <MaterialIcon name="trending_up" className="mr-2" />
-                    Run Forecast
-                  </Button>
-                </div>
-                
-                <Card className="bg-white shadow-sm border border-neutral-light">
-                  <CardContent className="p-4">
-                    <h3 className="font-medium text-neutral-darker mb-4">Forecasting Parameters</h3>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-                      <div>
-                        <label className="block text-sm font-medium text-neutral-dark mb-2">
-                          Forecast Period (months)
-                        </label>
-                        <Input 
-                          type="number" 
-                          defaultValue="12" 
-                          className="border-neutral-light"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-neutral-dark mb-2">
-                          Growth Rate (%)
-                        </label>
-                        <Input 
-                          type="number" 
-                          defaultValue="5" 
-                          className="border-neutral-light"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-neutral-dark mb-2">
-                          Seasonality Factor
-                        </label>
-                        <Input 
-                          type="number" 
-                          defaultValue="1.0" 
-                          className="border-neutral-light"
-                        />
-                      </div>
-                    </div>
-                    
-                    <div className="flex justify-end">
-                      <Button 
-                        onClick={() => toast({ title: "Update Parameters", description: "Forecasting parameters updated" })}
-                      >
-                        Update
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-                
-                <Card className="bg-white shadow-sm border border-neutral-light">
-                  <CardContent className="p-4">
-                    <div className="flex justify-between items-center mb-6">
-                      <h3 className="font-medium text-neutral-darker">Expense Forecast</h3>
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        onClick={() => toast({ title: "Export Forecast", description: "Exporting forecast data" })}
-                      >
-                        Export
-                      </Button>
-                    </div>
-                    
-                    <div className="chart-container" style={{ height: "350px" }}>
-                      <ResponsiveContainer width="100%" height="100%">
-                        <LineChart
-                          data={[
-                            { month: "Jul 23", actual: 58000, forecast: 58000 },
-                            { month: "Aug 23", actual: 58500, forecast: 58500 },
-                            { month: "Sep 23", actual: 59000, forecast: 59000 },
-                            { month: "Oct 23", actual: 0, forecast: 59750 },
-                            { month: "Nov 23", actual: 0, forecast: 60500 },
-                            { month: "Dec 23", actual: 0, forecast: 61250 },
-                            { month: "Jan 24", actual: 0, forecast: 62000 },
-                            { month: "Feb 24", actual: 0, forecast: 63000 },
-                            { month: "Mar 24", actual: 0, forecast: 64000 },
-                            { month: "Apr 24", actual: 0, forecast: 65000 },
-                            { month: "May 24", actual: 0, forecast: 66000 },
-                            { month: "Jun 24", actual: 0, forecast: 67000 }
-                          ]}
-                          margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-                        >
-                          <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                          <XAxis dataKey="month" />
-                          <YAxis tickFormatter={(value) => `$${value/1000}k`} />
-                          <Tooltip formatter={(value) => formatCurrency(value as number)} />
-                          <Legend />
-                          <Line 
-                            type="monotone" 
-                            dataKey="actual" 
-                            name="Actual Expenses" 
-                            stroke="#0078D4" 
-                            strokeWidth={2}
-                            activeDot={{ r: 8 }} 
-                          />
-                          <Line 
-                            type="monotone" 
-                            dataKey="forecast" 
-                            name="Forecasted Expenses" 
-                            stroke="#EDEBE9" 
-                            strokeWidth={2}
-                            strokeDasharray="5 5"
-                          />
-                        </LineChart>
-                      </ResponsiveContainer>
-                    </div>
-                  </CardContent>
-                </Card>
-              </TabsContent>
             </Tabs>
-          </div>
-        </main>
+          </CardContent>
+        </Card>
       </div>
 
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+      {/* Add Expense Dialog */}
+      <Dialog open={isAddExpenseDialogOpen} onOpenChange={setIsAddExpenseDialogOpen}>
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
-            <DialogTitle>{editingCategory ? "Edit Expense Category" : "Add Expense Category"}</DialogTitle>
+            <DialogTitle>Add Expense</DialogTitle>
             <DialogDescription>
-              {editingCategory 
-                ? "Update the details for this expense category" 
-                : "Create a new expense category to track your expenses"}
+              Add a new expense to your forecast.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="name">Category Name</Label>
-              <Input 
-                id="name" 
-                defaultValue={editingCategory ? expenseCategories.find(c => c.id === editingCategory)?.name : ""} 
-                placeholder="e.g., Marketing, Office Supplies" 
-                className="border-neutral-light"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="description">Description</Label>
-              <Input 
-                id="description" 
-                defaultValue={editingCategory ? "Existing description" : ""} 
-                placeholder="Brief description of this expense category" 
-                className="border-neutral-light"
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="budget">Monthly Budget ($)</Label>
-                <Input 
-                  id="budget" 
-                  type="number" 
-                  defaultValue={editingCategory ? expenseCategories.find(c => c.id === editingCategory)?.currentMonth : ""} 
-                  placeholder="e.g., 5000" 
-                  className="border-neutral-light"
-                />
+          <form onSubmit={handleAddExpense}>
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="name" className="text-right">
+                  Name
+                </Label>
+                <Input id="name" name="name" className="col-span-3" placeholder="Software Subscription" required />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="growth">Growth Rate (%)</Label>
-                <Input 
-                  id="growth" 
-                  type="number" 
-                  defaultValue="5" 
-                  placeholder="e.g., 5" 
-                  className="border-neutral-light"
-                />
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="amount" className="text-right">
+                  Amount
+                </Label>
+                <div className="col-span-3 flex">
+                  <span className="inline-flex items-center px-3 rounded-l-md border border-r-0 border-gray-300 bg-gray-50 text-gray-500 sm:text-sm">
+                    $
+                  </span>
+                  <Input
+                    id="amount"
+                    name="amount"
+                    type="number"
+                    className="rounded-l-none"
+                    min="0"
+                    step="0.01"
+                    required
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="frequency" className="text-right">
+                  Frequency
+                </Label>
+                <Select name="frequency" defaultValue="monthly">
+                  <SelectTrigger className="col-span-3">
+                    <SelectValue placeholder="Select frequency" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="monthly">Monthly</SelectItem>
+                    <SelectItem value="quarterly">Quarterly</SelectItem>
+                    <SelectItem value="annual">Annual</SelectItem>
+                    <SelectItem value="one-time">One-time</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="category" className="text-right">
+                  Category
+                </Label>
+                <Select name="category" defaultValue="Software">
+                  <SelectTrigger className="col-span-3">
+                    <SelectValue placeholder="Select category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Marketing">Marketing</SelectItem>
+                    <SelectItem value="Software">Software</SelectItem>
+                    <SelectItem value="Office">Office</SelectItem>
+                    <SelectItem value="Personnel">Personnel</SelectItem>
+                    <SelectItem value="Other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <div className="col-span-4 flex items-center space-x-2 justify-end">
+                  <Checkbox id="isCogsRelated" name="isCogsRelated" />
+                  <Label htmlFor="isCogsRelated">
+                    This expense is related to Cost of Goods Sold (COGS)
+                  </Label>
+                </div>
               </div>
             </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsDialogOpen(false)}>Cancel</Button>
-            <Button onClick={handleSaveExpenseCategory}>Save</Button>
-          </DialogFooter>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setIsAddExpenseDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={addExpenseMutation.isPending}>
+                {addExpenseMutation.isPending ? "Adding..." : "Add Expense"}
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
-    </div>
+    </>
   );
 };
 

@@ -1,262 +1,393 @@
 import {
   User, InsertUser,
-  Workspace, InsertWorkspace,
+  Forecast, InsertForecast,
+  RevenueDriver, InsertRevenueDriver,
   RevenueStream, InsertRevenueStream,
-  RevenueProjection, InsertRevenueProjection,
-  ExpenseCategory, InsertExpenseCategory,
-  ExpenseProjection, InsertExpenseProjection,
+  Expense, InsertExpense,
+  Department, InsertDepartment,
   PersonnelRole, InsertPersonnelRole,
-  PersonnelProjection, InsertPersonnelProjection,
-  Formula, InsertFormula,
-  Scenario, InsertScenario,
+  CustomFormula, InsertCustomFormula,
   QuickbooksIntegration, InsertQuickbooksIntegration,
-  Transaction, InsertTransaction
+  FinancialProjection, InsertFinancialProjection
 } from "@shared/schema";
 
-// Define storage interface
 export interface IStorage {
-  // Users
+  // User operations
   getUser(id: number): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
-
-  // Workspaces
-  getWorkspace(id: number): Promise<Workspace | undefined>;
-  getWorkspacesByOwnerId(ownerId: number): Promise<Workspace[]>;
-  createWorkspace(workspace: InsertWorkspace): Promise<Workspace>;
-  updateWorkspace(id: number, workspace: Partial<InsertWorkspace>): Promise<Workspace | undefined>;
-  deleteWorkspace(id: number): Promise<boolean>;
-
-  // Revenue Streams
+  
+  // Forecast operations
+  getForecastsByUserId(userId: number): Promise<Forecast[]>;
+  getForecast(id: number): Promise<Forecast | undefined>;
+  createForecast(forecast: InsertForecast): Promise<Forecast>;
+  updateForecast(id: number, forecast: Partial<InsertForecast>): Promise<Forecast | undefined>;
+  deleteForecast(id: number): Promise<boolean>;
+  
+  // Revenue Driver operations
+  getRevenueDriversByForecastId(forecastId: number): Promise<RevenueDriver[]>;
+  getRevenueDriver(id: number): Promise<RevenueDriver | undefined>;
+  createRevenueDriver(driver: InsertRevenueDriver): Promise<RevenueDriver>;
+  updateRevenueDriver(id: number, driver: Partial<InsertRevenueDriver>): Promise<RevenueDriver | undefined>;
+  deleteRevenueDriver(id: number): Promise<boolean>;
+  
+  // Revenue Stream operations
+  getRevenueStreamsByForecastId(forecastId: number): Promise<RevenueStream[]>;
   getRevenueStream(id: number): Promise<RevenueStream | undefined>;
-  getRevenueStreamsByWorkspaceId(workspaceId: number): Promise<RevenueStream[]>;
   createRevenueStream(stream: InsertRevenueStream): Promise<RevenueStream>;
   updateRevenueStream(id: number, stream: Partial<InsertRevenueStream>): Promise<RevenueStream | undefined>;
   deleteRevenueStream(id: number): Promise<boolean>;
-
-  // Revenue Projections
-  getRevenueProjection(id: number): Promise<RevenueProjection | undefined>;
-  getRevenueProjectionsByStreamId(streamId: number): Promise<RevenueProjection[]>;
-  getRevenueProjectionsByWorkspaceId(workspaceId: number, month?: string): Promise<RevenueProjection[]>;
-  createRevenueProjection(projection: InsertRevenueProjection): Promise<RevenueProjection>;
-  updateRevenueProjection(id: number, projection: Partial<InsertRevenueProjection>): Promise<RevenueProjection | undefined>;
-  deleteRevenueProjection(id: number): Promise<boolean>;
-
-  // Expense Categories
-  getExpenseCategory(id: number): Promise<ExpenseCategory | undefined>;
-  getExpenseCategoriesByWorkspaceId(workspaceId: number): Promise<ExpenseCategory[]>;
-  createExpenseCategory(category: InsertExpenseCategory): Promise<ExpenseCategory>;
-  updateExpenseCategory(id: number, category: Partial<InsertExpenseCategory>): Promise<ExpenseCategory | undefined>;
-  deleteExpenseCategory(id: number): Promise<boolean>;
-
-  // Expense Projections
-  getExpenseProjection(id: number): Promise<ExpenseProjection | undefined>;
-  getExpenseProjectionsByCategoryId(categoryId: number): Promise<ExpenseProjection[]>;
-  getExpenseProjectionsByWorkspaceId(workspaceId: number, month?: string): Promise<ExpenseProjection[]>;
-  createExpenseProjection(projection: InsertExpenseProjection): Promise<ExpenseProjection>;
-  updateExpenseProjection(id: number, projection: Partial<InsertExpenseProjection>): Promise<ExpenseProjection | undefined>;
-  deleteExpenseProjection(id: number): Promise<boolean>;
-
-  // Personnel Roles
+  
+  // Expense operations
+  getExpensesByForecastId(forecastId: number): Promise<Expense[]>;
+  getExpense(id: number): Promise<Expense | undefined>;
+  createExpense(expense: InsertExpense): Promise<Expense>;
+  updateExpense(id: number, expense: Partial<InsertExpense>): Promise<Expense | undefined>;
+  deleteExpense(id: number): Promise<boolean>;
+  
+  // Department operations
+  getDepartmentsByForecastId(forecastId: number): Promise<Department[]>;
+  getDepartment(id: number): Promise<Department | undefined>;
+  createDepartment(department: InsertDepartment): Promise<Department>;
+  updateDepartment(id: number, department: Partial<InsertDepartment>): Promise<Department | undefined>;
+  deleteDepartment(id: number): Promise<boolean>;
+  
+  // Personnel Role operations
+  getPersonnelRolesByForecastId(forecastId: number): Promise<PersonnelRole[]>;
+  getPersonnelRolesByDepartmentId(departmentId: number): Promise<PersonnelRole[]>;
   getPersonnelRole(id: number): Promise<PersonnelRole | undefined>;
-  getPersonnelRolesByWorkspaceId(workspaceId: number): Promise<PersonnelRole[]>;
   createPersonnelRole(role: InsertPersonnelRole): Promise<PersonnelRole>;
   updatePersonnelRole(id: number, role: Partial<InsertPersonnelRole>): Promise<PersonnelRole | undefined>;
   deletePersonnelRole(id: number): Promise<boolean>;
-
-  // Personnel Projections
-  getPersonnelProjection(id: number): Promise<PersonnelProjection | undefined>;
-  getPersonnelProjectionsByRoleId(roleId: number): Promise<PersonnelProjection[]>;
-  getPersonnelProjectionsByWorkspaceId(workspaceId: number, month?: string): Promise<PersonnelProjection[]>;
-  createPersonnelProjection(projection: InsertPersonnelProjection): Promise<PersonnelProjection>;
-  updatePersonnelProjection(id: number, projection: Partial<InsertPersonnelProjection>): Promise<PersonnelProjection | undefined>;
-  deletePersonnelProjection(id: number): Promise<boolean>;
-
-  // Formulas
-  getFormula(id: number): Promise<Formula | undefined>;
-  getFormulasByWorkspaceId(workspaceId: number): Promise<Formula[]>;
-  createFormula(formula: InsertFormula): Promise<Formula>;
-  updateFormula(id: number, formula: Partial<InsertFormula>): Promise<Formula | undefined>;
-  deleteFormula(id: number): Promise<boolean>;
-
-  // Scenarios
-  getScenario(id: number): Promise<Scenario | undefined>;
-  getScenariosByWorkspaceId(workspaceId: number): Promise<Scenario[]>;
-  getActiveScenarioByWorkspaceId(workspaceId: number): Promise<Scenario | undefined>;
-  createScenario(scenario: InsertScenario): Promise<Scenario>;
-  updateScenario(id: number, scenario: Partial<InsertScenario>): Promise<Scenario | undefined>;
-  deleteScenario(id: number): Promise<boolean>;
-  setActiveScenario(id: number, workspaceId: number): Promise<boolean>;
-
-  // QuickBooks Integration
-  getQuickbooksIntegration(workspaceId: number): Promise<QuickbooksIntegration | undefined>;
-  createOrUpdateQuickbooksIntegration(integration: InsertQuickbooksIntegration): Promise<QuickbooksIntegration>;
-  disconnectQuickbooksIntegration(workspaceId: number): Promise<boolean>;
-
-  // Transactions
-  getTransaction(id: number): Promise<Transaction | undefined>;
-  getTransactionsByWorkspaceId(workspaceId: number, limit?: number): Promise<Transaction[]>;
-  createTransaction(transaction: InsertTransaction): Promise<Transaction>;
-  deleteTransaction(id: number): Promise<boolean>;
+  
+  // Custom Formula operations
+  getCustomFormulasByForecastId(forecastId: number): Promise<CustomFormula[]>;
+  getCustomFormula(id: number): Promise<CustomFormula | undefined>;
+  createCustomFormula(formula: InsertCustomFormula): Promise<CustomFormula>;
+  updateCustomFormula(id: number, formula: Partial<InsertCustomFormula>): Promise<CustomFormula | undefined>;
+  deleteCustomFormula(id: number): Promise<boolean>;
+  
+  // QuickBooks Integration operations
+  getQuickbooksIntegrationByUserId(userId: number): Promise<QuickbooksIntegration | undefined>;
+  createQuickbooksIntegration(integration: InsertQuickbooksIntegration): Promise<QuickbooksIntegration>;
+  updateQuickbooksIntegration(userId: number, integration: Partial<InsertQuickbooksIntegration>): Promise<QuickbooksIntegration | undefined>;
+  deleteQuickbooksIntegration(userId: number): Promise<boolean>;
+  
+  // Financial Projection operations
+  getFinancialProjectionsByForecastId(forecastId: number): Promise<FinancialProjection[]>;
+  getFinancialProjection(id: number): Promise<FinancialProjection | undefined>;
+  createFinancialProjection(projection: InsertFinancialProjection): Promise<FinancialProjection>;
+  updateFinancialProjection(id: number, projection: Partial<InsertFinancialProjection>): Promise<FinancialProjection | undefined>;
+  deleteFinancialProjection(id: number): Promise<boolean>;
 }
 
 export class MemStorage implements IStorage {
   private users: Map<number, User>;
-  private workspaces: Map<number, Workspace>;
+  private forecasts: Map<number, Forecast>;
+  private revenueDrivers: Map<number, RevenueDriver>;
   private revenueStreams: Map<number, RevenueStream>;
-  private revenueProjections: Map<number, RevenueProjection>;
-  private expenseCategories: Map<number, ExpenseCategory>;
-  private expenseProjections: Map<number, ExpenseProjection>;
+  private expenses: Map<number, Expense>;
+  private departments: Map<number, Department>;
   private personnelRoles: Map<number, PersonnelRole>;
-  private personnelProjections: Map<number, PersonnelProjection>;
-  private formulas: Map<number, Formula>;
-  private scenarios: Map<number, Scenario>;
+  private customFormulas: Map<number, CustomFormula>;
   private quickbooksIntegrations: Map<number, QuickbooksIntegration>;
-  private transactions: Map<number, Transaction>;
-
-  private userIdCounter: number;
-  private workspaceIdCounter: number;
-  private revenueStreamIdCounter: number;
-  private revenueProjectionIdCounter: number;
-  private expenseCategoryIdCounter: number;
-  private expenseProjectionIdCounter: number;
-  private personnelRoleIdCounter: number;
-  private personnelProjectionIdCounter: number;
-  private formulaIdCounter: number;
-  private scenarioIdCounter: number;
-  private quickbooksIntegrationIdCounter: number;
-  private transactionIdCounter: number;
+  private financialProjections: Map<number, FinancialProjection>;
+  
+  private currentUserId: number;
+  private currentForecastId: number;
+  private currentRevenueDriverId: number;
+  private currentRevenueStreamId: number;
+  private currentExpenseId: number;
+  private currentDepartmentId: number;
+  private currentPersonnelRoleId: number;
+  private currentCustomFormulaId: number;
+  private currentQuickbooksIntegrationId: number;
+  private currentFinancialProjectionId: number;
 
   constructor() {
     this.users = new Map();
-    this.workspaces = new Map();
+    this.forecasts = new Map();
+    this.revenueDrivers = new Map();
     this.revenueStreams = new Map();
-    this.revenueProjections = new Map();
-    this.expenseCategories = new Map();
-    this.expenseProjections = new Map();
+    this.expenses = new Map();
+    this.departments = new Map();
     this.personnelRoles = new Map();
-    this.personnelProjections = new Map();
-    this.formulas = new Map();
-    this.scenarios = new Map();
+    this.customFormulas = new Map();
     this.quickbooksIntegrations = new Map();
-    this.transactions = new Map();
-
-    this.userIdCounter = 1;
-    this.workspaceIdCounter = 1;
-    this.revenueStreamIdCounter = 1;
-    this.revenueProjectionIdCounter = 1;
-    this.expenseCategoryIdCounter = 1;
-    this.expenseProjectionIdCounter = 1;
-    this.personnelRoleIdCounter = 1;
-    this.personnelProjectionIdCounter = 1;
-    this.formulaIdCounter = 1;
-    this.scenarioIdCounter = 1;
-    this.quickbooksIntegrationIdCounter = 1;
-    this.transactionIdCounter = 1;
-
+    this.financialProjections = new Map();
+    
+    this.currentUserId = 1;
+    this.currentForecastId = 1;
+    this.currentRevenueDriverId = 1;
+    this.currentRevenueStreamId = 1;
+    this.currentExpenseId = 1;
+    this.currentDepartmentId = 1;
+    this.currentPersonnelRoleId = 1;
+    this.currentCustomFormulaId = 1;
+    this.currentQuickbooksIntegrationId = 1;
+    this.currentFinancialProjectionId = 1;
+    
     // Initialize with demo data
     this.initializeDemoData();
   }
 
-  // Initialize demo data for the application
   private initializeDemoData() {
     // Create a demo user
     const demoUser: InsertUser = {
       username: "demo",
-      password: "demo123", // In a real app, this would be hashed
+      password: "password",
       email: "demo@example.com",
-      fullName: "John Smith",
-      companyName: "Startup Inc."
+      companyName: "Demo Company"
     };
-    this.createUser(demoUser);
-
-    // Create a workspace
-    const demoWorkspace: InsertWorkspace = {
-      name: "Startup Growth Plan",
-      description: "Financial planning for our startup",
-      ownerId: 1
+    
+    const user = this.createUser(demoUser);
+    
+    // Create a demo forecast
+    const demoForecast: InsertForecast = {
+      userId: user.id,
+      name: "2023 Growth Plan",
+      description: "Financial forecast for 2023 growth",
+      currency: "USD"
     };
-    this.createWorkspace(demoWorkspace);
-
-    // Create revenue streams
-    const revenueStreams = [
-      { name: "Basic Subscription", type: "subscription", description: "Monthly basic tier", workspaceId: 1 },
-      { name: "Premium Tier", type: "subscription", description: "Monthly premium tier", workspaceId: 1 },
-      { name: "Enterprise Plans", type: "subscription", description: "Annual enterprise contracts", workspaceId: 1 },
-      { name: "One-time Services", type: "one-time", description: "Implementation and consulting", workspaceId: 1 }
+    
+    const forecast = this.createForecast(demoForecast);
+    
+    // Create demo revenue drivers
+    const demoRevenueDrivers: InsertRevenueDriver[] = [
+      {
+        forecastId: forecast.id,
+        name: "Monthly Active Users",
+        value: "45200",
+        unit: "users",
+        minValue: "0",
+        maxValue: "100000",
+        growthRate: "0.024", // 2.4%
+        category: "usage"
+      },
+      {
+        forecastId: forecast.id,
+        name: "Conversion Rate",
+        value: "5.8",
+        unit: "%",
+        minValue: "0",
+        maxValue: "10",
+        growthRate: "0.003", // 0.3%
+        category: "conversion"
+      },
+      {
+        forecastId: forecast.id,
+        name: "ARPU",
+        value: "89",
+        unit: "USD",
+        minValue: "0",
+        maxValue: "100",
+        growthRate: "0.052", // 5.2%
+        category: "monetization"
+      }
     ];
-
-    revenueStreams.forEach(stream => {
-      this.createRevenueStream(stream as InsertRevenueStream);
-    });
-
-    // Create expense categories
-    const expenseCategories = [
-      { name: "Personnel", description: "Salaries and benefits", workspaceId: 1 },
-      { name: "Marketing", description: "Advertising and promotions", workspaceId: 1 },
-      { name: "Software & Tools", description: "SaaS and tools", workspaceId: 1 },
-      { name: "Office & Operations", description: "Rent and utilities", workspaceId: 1 }
+    
+    demoRevenueDrivers.forEach(driver => this.createRevenueDriver(driver));
+    
+    // Create demo revenue streams
+    const demoRevenueStreams: InsertRevenueStream[] = [
+      {
+        forecastId: forecast.id,
+        name: "Subscription Revenue",
+        type: "subscription",
+        amount: "1850400",
+        frequency: "annual",
+        growthRate: "0.182", // 18.2%
+        category: "core"
+      },
+      {
+        forecastId: forecast.id,
+        name: "Service Revenue",
+        type: "service",
+        amount: "452800",
+        frequency: "annual",
+        growthRate: "0.057", // 5.7%
+        category: "services"
+      },
+      {
+        forecastId: forecast.id,
+        name: "One-time Sales",
+        type: "one-time",
+        amount: "155000",
+        frequency: "annual",
+        growthRate: "-0.023", // -2.3%
+        category: "other"
+      }
     ];
-
-    expenseCategories.forEach(category => {
-      this.createExpenseCategory(category as InsertExpenseCategory);
-    });
-
-    // Create personnel roles
-    const personnelRoles = [
-      { title: "Software Engineer", department: "Engineering", baseSalary: 120000, benefits: 24000, taxes: 18000, workspaceId: 1 },
-      { title: "Product Manager", department: "Product", baseSalary: 130000, benefits: 26000, taxes: 19500, workspaceId: 1 },
-      { title: "Sales Representative", department: "Sales", baseSalary: 100000, benefits: 20000, taxes: 15000, workspaceId: 1 },
-      { title: "Marketing Specialist", department: "Marketing", baseSalary: 90000, benefits: 18000, taxes: 13500, workspaceId: 1 }
+    
+    demoRevenueStreams.forEach(stream => this.createRevenueStream(stream));
+    
+    // Create demo departments
+    const demoDepartments: InsertDepartment[] = [
+      {
+        forecastId: forecast.id,
+        name: "Engineering"
+      },
+      {
+        forecastId: forecast.id,
+        name: "Sales"
+      },
+      {
+        forecastId: forecast.id,
+        name: "Marketing"
+      }
     ];
-
-    personnelRoles.forEach(role => {
-      this.createPersonnelRole(role as InsertPersonnelRole);
-    });
-
-    // Create scenarios
-    const scenarios = [
-      { name: "Base Scenario", description: "Current plan", isActive: true, workspaceId: 1, assumptions: { mrrGrowth: 10, burnRate: 42000, runway: 14.2 } },
-      { name: "Optimistic Growth", description: "Product-market fit", isActive: false, workspaceId: 1, assumptions: { mrrGrowth: 18, burnRate: 52000, runway: 11.9 } }
+    
+    const departments = demoDepartments.map(dept => this.createDepartment(dept));
+    
+    // Create demo personnel roles
+    const demoPersonnelRoles: InsertPersonnelRole[] = [
+      {
+        forecastId: forecast.id,
+        departmentId: departments[0].id,
+        title: "Software Engineer",
+        count: 18,
+        plannedCount: 22,
+        annualSalary: "125000",
+        benefits: "0.2", // 20% benefits
+      },
+      {
+        forecastId: forecast.id,
+        departmentId: departments[1].id,
+        title: "Sales Representative",
+        count: 12,
+        plannedCount: 15,
+        annualSalary: "110000",
+        benefits: "0.15", // 15% benefits
+      },
+      {
+        forecastId: forecast.id,
+        departmentId: departments[2].id,
+        title: "Marketing Specialist",
+        count: 8,
+        plannedCount: 10,
+        annualSalary: "95000",
+        benefits: "0.18", // 18% benefits
+      }
     ];
-
-    scenarios.forEach(scenario => {
-      this.createScenario(scenario as InsertScenario);
-    });
-
-    // Create formula
-    const formula: InsertFormula = {
-      name: "Customer Acquisition Cost",
-      description: "Marketing spend divided by new customers",
-      formula: "[Marketing.Total] / [Revenue.NewCustomers]",
-      variables: { "Marketing.Total": "Marketing expenses total", "Revenue.NewCustomers": "Number of new customers" },
-      workspaceId: 1
-    };
-    this.createFormula(formula);
-
-    // Create QuickBooks integration
-    const qbIntegration: InsertQuickbooksIntegration = {
-      workspaceId: 1,
-      isConnected: true,
-      realmId: "123456789",
-      accessToken: "sample-access-token",
-      refreshToken: "sample-refresh-token",
-      lastSynced: new Date()
-    };
-    this.createOrUpdateQuickbooksIntegration(qbIntegration);
-
-    // Create some transactions
-    const transactions = [
-      { workspaceId: 1, date: new Date(), description: "Adobe Creative Cloud", amount: 52.99, category: "Software", type: "expense", externalId: "qb-123" },
-      { workspaceId: 1, date: new Date(), description: "Customer Payment #10045", amount: 49.00, category: "Basic Plan", type: "income", externalId: "qb-124" },
-      { workspaceId: 1, date: new Date(), description: "AWS Cloud Services", amount: 342.18, category: "Infrastructure", type: "expense", externalId: "qb-125" },
-      { workspaceId: 1, date: new Date(), description: "Enterprise Client #E-224", amount: 4800.00, category: "Enterprise Plans", type: "income", externalId: "qb-126" }
+    
+    demoPersonnelRoles.forEach(role => this.createPersonnelRole(role));
+    
+    // Create demo expenses
+    const demoExpenses: InsertExpense[] = [
+      {
+        forecastId: forecast.id,
+        name: "Marketing Expense",
+        amount: "18400",
+        frequency: "monthly",
+        category: "Marketing",
+        isCogsRelated: false
+      },
+      {
+        forecastId: forecast.id,
+        name: "Software Subscriptions",
+        amount: "12350",
+        frequency: "monthly",
+        category: "Software",
+        isCogsRelated: false
+      },
+      {
+        forecastId: forecast.id,
+        name: "Office Rent",
+        amount: "6750",
+        frequency: "monthly",
+        category: "Office",
+        isCogsRelated: false
+      },
+      {
+        forecastId: forecast.id,
+        name: "Miscellaneous",
+        amount: "3850",
+        frequency: "monthly",
+        category: "Other",
+        isCogsRelated: false
+      }
     ];
-
-    transactions.forEach(transaction => {
-      this.createTransaction(transaction as InsertTransaction);
-    });
+    
+    demoExpenses.forEach(expense => this.createExpense(expense));
+    
+    // Create demo custom formulas
+    const demoFormulas: InsertCustomFormula[] = [
+      {
+        forecastId: forecast.id,
+        name: "Annual MRR",
+        formula: "Monthly Active Users * Conversion Rate * ARPU * 12",
+        description: "Calculates Annual MRR based on core metrics",
+        category: "Revenue"
+      },
+      {
+        forecastId: forecast.id,
+        name: "CAC Payback Period",
+        formula: "Customer Acquisition Cost / (ARPU * Gross Margin)",
+        description: "Months to recover CAC",
+        category: "Metrics"
+      }
+    ];
+    
+    demoFormulas.forEach(formula => this.createCustomFormula(formula));
+    
+    // Create demo financial projections
+    const demoProjections: InsertFinancialProjection[] = [
+      {
+        forecastId: forecast.id,
+        period: "01-2023",
+        revenueTotal: "215000",
+        cogsTotal: "65000",
+        expenseTotal: "120000",
+        personnelTotal: "84250",
+        netProfit: "30000",
+        cashInflow: "215000",
+        cashOutflow: "185000",
+        cashBalance: "980000",
+        projectionData: {}
+      },
+      {
+        forecastId: forecast.id,
+        period: "02-2023",
+        revenueTotal: "220000",
+        cogsTotal: "68000",
+        expenseTotal: "127000",
+        personnelTotal: "84250",
+        netProfit: "25000",
+        cashInflow: "220000",
+        cashOutflow: "195000",
+        cashBalance: "1005000",
+        projectionData: {}
+      },
+      {
+        forecastId: forecast.id,
+        period: "03-2023",
+        revenueTotal: "205000",
+        cogsTotal: "62000",
+        expenseTotal: "148000",
+        personnelTotal: "84250",
+        netProfit: "-5000",
+        cashInflow: "205000",
+        cashOutflow: "210000",
+        cashBalance: "1000000",
+        projectionData: {}
+      },
+      {
+        forecastId: forecast.id,
+        period: "04-2023",
+        revenueTotal: "235000",
+        cogsTotal: "71000",
+        expenseTotal: "134000",
+        personnelTotal: "84250",
+        netProfit: "30000",
+        cashInflow: "235000",
+        cashOutflow: "205000",
+        cashBalance: "1030000",
+        projectionData: {}
+      }
+    ];
+    
+    demoProjections.forEach(projection => this.createFinancialProjection(projection));
   }
 
   // User methods
@@ -265,404 +396,361 @@ export class MemStorage implements IStorage {
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(user => user.username === username);
+    return Array.from(this.users.values()).find(
+      (user) => user.username === username,
+    );
   }
-
+  
   async getUserByEmail(email: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(user => user.email === email);
+    return Array.from(this.users.values()).find(
+      (user) => user.email === email,
+    );
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {
-    const id = this.userIdCounter++;
-    const user: User = { ...insertUser, id, createdAt: new Date() };
+    const id = this.currentUserId++;
+    const now = new Date();
+    const user: User = { ...insertUser, id, createdAt: now };
     this.users.set(id, user);
     return user;
   }
-
-  // Workspace methods
-  async getWorkspace(id: number): Promise<Workspace | undefined> {
-    return this.workspaces.get(id);
+  
+  // Forecast methods
+  async getForecastsByUserId(userId: number): Promise<Forecast[]> {
+    return Array.from(this.forecasts.values()).filter(
+      (forecast) => forecast.userId === userId,
+    );
   }
-
-  async getWorkspacesByOwnerId(ownerId: number): Promise<Workspace[]> {
-    return Array.from(this.workspaces.values()).filter(workspace => workspace.ownerId === ownerId);
+  
+  async getForecast(id: number): Promise<Forecast | undefined> {
+    return this.forecasts.get(id);
   }
-
-  async createWorkspace(insertWorkspace: InsertWorkspace): Promise<Workspace> {
-    const id = this.workspaceIdCounter++;
-    const workspace: Workspace = { ...insertWorkspace, id, createdAt: new Date() };
-    this.workspaces.set(id, workspace);
-    return workspace;
+  
+  async createForecast(insertForecast: InsertForecast): Promise<Forecast> {
+    const id = this.currentForecastId++;
+    const now = new Date();
+    const forecast: Forecast = { ...insertForecast, id, createdAt: now, updatedAt: now };
+    this.forecasts.set(id, forecast);
+    return forecast;
   }
-
-  async updateWorkspace(id: number, workspace: Partial<InsertWorkspace>): Promise<Workspace | undefined> {
-    const existing = await this.getWorkspace(id);
-    if (!existing) return undefined;
+  
+  async updateForecast(id: number, updateData: Partial<InsertForecast>): Promise<Forecast | undefined> {
+    const forecast = await this.getForecast(id);
+    if (!forecast) return undefined;
     
-    const updated = { ...existing, ...workspace };
-    this.workspaces.set(id, updated);
-    return updated;
+    const updatedForecast: Forecast = {
+      ...forecast,
+      ...updateData,
+      updatedAt: new Date()
+    };
+    
+    this.forecasts.set(id, updatedForecast);
+    return updatedForecast;
   }
-
-  async deleteWorkspace(id: number): Promise<boolean> {
-    return this.workspaces.delete(id);
+  
+  async deleteForecast(id: number): Promise<boolean> {
+    return this.forecasts.delete(id);
   }
-
+  
+  // Revenue Driver methods
+  async getRevenueDriversByForecastId(forecastId: number): Promise<RevenueDriver[]> {
+    return Array.from(this.revenueDrivers.values()).filter(
+      (driver) => driver.forecastId === forecastId,
+    );
+  }
+  
+  async getRevenueDriver(id: number): Promise<RevenueDriver | undefined> {
+    return this.revenueDrivers.get(id);
+  }
+  
+  async createRevenueDriver(insertDriver: InsertRevenueDriver): Promise<RevenueDriver> {
+    const id = this.currentRevenueDriverId++;
+    const now = new Date();
+    const driver: RevenueDriver = { ...insertDriver, id, createdAt: now, updatedAt: now };
+    this.revenueDrivers.set(id, driver);
+    return driver;
+  }
+  
+  async updateRevenueDriver(id: number, updateData: Partial<InsertRevenueDriver>): Promise<RevenueDriver | undefined> {
+    const driver = await this.getRevenueDriver(id);
+    if (!driver) return undefined;
+    
+    const updatedDriver: RevenueDriver = {
+      ...driver,
+      ...updateData,
+      updatedAt: new Date()
+    };
+    
+    this.revenueDrivers.set(id, updatedDriver);
+    return updatedDriver;
+  }
+  
+  async deleteRevenueDriver(id: number): Promise<boolean> {
+    return this.revenueDrivers.delete(id);
+  }
+  
   // Revenue Stream methods
+  async getRevenueStreamsByForecastId(forecastId: number): Promise<RevenueStream[]> {
+    return Array.from(this.revenueStreams.values()).filter(
+      (stream) => stream.forecastId === forecastId,
+    );
+  }
+  
   async getRevenueStream(id: number): Promise<RevenueStream | undefined> {
     return this.revenueStreams.get(id);
   }
-
-  async getRevenueStreamsByWorkspaceId(workspaceId: number): Promise<RevenueStream[]> {
-    return Array.from(this.revenueStreams.values()).filter(stream => stream.workspaceId === workspaceId);
-  }
-
+  
   async createRevenueStream(insertStream: InsertRevenueStream): Promise<RevenueStream> {
-    const id = this.revenueStreamIdCounter++;
-    const stream: RevenueStream = { ...insertStream, id, createdAt: new Date() };
+    const id = this.currentRevenueStreamId++;
+    const now = new Date();
+    const stream: RevenueStream = { ...insertStream, id, createdAt: now, updatedAt: now };
     this.revenueStreams.set(id, stream);
     return stream;
   }
-
-  async updateRevenueStream(id: number, stream: Partial<InsertRevenueStream>): Promise<RevenueStream | undefined> {
-    const existing = await this.getRevenueStream(id);
-    if (!existing) return undefined;
+  
+  async updateRevenueStream(id: number, updateData: Partial<InsertRevenueStream>): Promise<RevenueStream | undefined> {
+    const stream = await this.getRevenueStream(id);
+    if (!stream) return undefined;
     
-    const updated = { ...existing, ...stream };
-    this.revenueStreams.set(id, updated);
-    return updated;
+    const updatedStream: RevenueStream = {
+      ...stream,
+      ...updateData,
+      updatedAt: new Date()
+    };
+    
+    this.revenueStreams.set(id, updatedStream);
+    return updatedStream;
   }
-
+  
   async deleteRevenueStream(id: number): Promise<boolean> {
     return this.revenueStreams.delete(id);
   }
-
-  // Revenue Projection methods
-  async getRevenueProjection(id: number): Promise<RevenueProjection | undefined> {
-    return this.revenueProjections.get(id);
+  
+  // Expense methods
+  async getExpensesByForecastId(forecastId: number): Promise<Expense[]> {
+    return Array.from(this.expenses.values()).filter(
+      (expense) => expense.forecastId === forecastId,
+    );
   }
-
-  async getRevenueProjectionsByStreamId(streamId: number): Promise<RevenueProjection[]> {
-    return Array.from(this.revenueProjections.values()).filter(projection => projection.streamId === streamId);
+  
+  async getExpense(id: number): Promise<Expense | undefined> {
+    return this.expenses.get(id);
   }
-
-  async getRevenueProjectionsByWorkspaceId(workspaceId: number, month?: string): Promise<RevenueProjection[]> {
-    let projections = Array.from(this.revenueProjections.values()).filter(projection => projection.workspaceId === workspaceId);
+  
+  async createExpense(insertExpense: InsertExpense): Promise<Expense> {
+    const id = this.currentExpenseId++;
+    const now = new Date();
+    const expense: Expense = { ...insertExpense, id, createdAt: now, updatedAt: now };
+    this.expenses.set(id, expense);
+    return expense;
+  }
+  
+  async updateExpense(id: number, updateData: Partial<InsertExpense>): Promise<Expense | undefined> {
+    const expense = await this.getExpense(id);
+    if (!expense) return undefined;
     
-    if (month) {
-      projections = projections.filter(projection => projection.month === month);
-    }
+    const updatedExpense: Expense = {
+      ...expense,
+      ...updateData,
+      updatedAt: new Date()
+    };
     
-    return projections;
+    this.expenses.set(id, updatedExpense);
+    return updatedExpense;
   }
-
-  async createRevenueProjection(insertProjection: InsertRevenueProjection): Promise<RevenueProjection> {
-    const id = this.revenueProjectionIdCounter++;
-    const projection: RevenueProjection = { ...insertProjection, id, createdAt: new Date() };
-    this.revenueProjections.set(id, projection);
-    return projection;
+  
+  async deleteExpense(id: number): Promise<boolean> {
+    return this.expenses.delete(id);
   }
-
-  async updateRevenueProjection(id: number, projection: Partial<InsertRevenueProjection>): Promise<RevenueProjection | undefined> {
-    const existing = await this.getRevenueProjection(id);
-    if (!existing) return undefined;
+  
+  // Department methods
+  async getDepartmentsByForecastId(forecastId: number): Promise<Department[]> {
+    return Array.from(this.departments.values()).filter(
+      (department) => department.forecastId === forecastId,
+    );
+  }
+  
+  async getDepartment(id: number): Promise<Department | undefined> {
+    return this.departments.get(id);
+  }
+  
+  async createDepartment(insertDepartment: InsertDepartment): Promise<Department> {
+    const id = this.currentDepartmentId++;
+    const now = new Date();
+    const department: Department = { ...insertDepartment, id, createdAt: now, updatedAt: now };
+    this.departments.set(id, department);
+    return department;
+  }
+  
+  async updateDepartment(id: number, updateData: Partial<InsertDepartment>): Promise<Department | undefined> {
+    const department = await this.getDepartment(id);
+    if (!department) return undefined;
     
-    const updated = { ...existing, ...projection };
-    this.revenueProjections.set(id, updated);
-    return updated;
-  }
-
-  async deleteRevenueProjection(id: number): Promise<boolean> {
-    return this.revenueProjections.delete(id);
-  }
-
-  // Expense Category methods
-  async getExpenseCategory(id: number): Promise<ExpenseCategory | undefined> {
-    return this.expenseCategories.get(id);
-  }
-
-  async getExpenseCategoriesByWorkspaceId(workspaceId: number): Promise<ExpenseCategory[]> {
-    return Array.from(this.expenseCategories.values()).filter(category => category.workspaceId === workspaceId);
-  }
-
-  async createExpenseCategory(insertCategory: InsertExpenseCategory): Promise<ExpenseCategory> {
-    const id = this.expenseCategoryIdCounter++;
-    const category: ExpenseCategory = { ...insertCategory, id, createdAt: new Date() };
-    this.expenseCategories.set(id, category);
-    return category;
-  }
-
-  async updateExpenseCategory(id: number, category: Partial<InsertExpenseCategory>): Promise<ExpenseCategory | undefined> {
-    const existing = await this.getExpenseCategory(id);
-    if (!existing) return undefined;
+    const updatedDepartment: Department = {
+      ...department,
+      ...updateData,
+      updatedAt: new Date()
+    };
     
-    const updated = { ...existing, ...category };
-    this.expenseCategories.set(id, updated);
-    return updated;
+    this.departments.set(id, updatedDepartment);
+    return updatedDepartment;
   }
-
-  async deleteExpenseCategory(id: number): Promise<boolean> {
-    return this.expenseCategories.delete(id);
+  
+  async deleteDepartment(id: number): Promise<boolean> {
+    return this.departments.delete(id);
   }
-
-  // Expense Projection methods
-  async getExpenseProjection(id: number): Promise<ExpenseProjection | undefined> {
-    return this.expenseProjections.get(id);
-  }
-
-  async getExpenseProjectionsByCategoryId(categoryId: number): Promise<ExpenseProjection[]> {
-    return Array.from(this.expenseProjections.values()).filter(projection => projection.categoryId === categoryId);
-  }
-
-  async getExpenseProjectionsByWorkspaceId(workspaceId: number, month?: string): Promise<ExpenseProjection[]> {
-    let projections = Array.from(this.expenseProjections.values()).filter(projection => projection.workspaceId === workspaceId);
-    
-    if (month) {
-      projections = projections.filter(projection => projection.month === month);
-    }
-    
-    return projections;
-  }
-
-  async createExpenseProjection(insertProjection: InsertExpenseProjection): Promise<ExpenseProjection> {
-    const id = this.expenseProjectionIdCounter++;
-    const projection: ExpenseProjection = { ...insertProjection, id, createdAt: new Date() };
-    this.expenseProjections.set(id, projection);
-    return projection;
-  }
-
-  async updateExpenseProjection(id: number, projection: Partial<InsertExpenseProjection>): Promise<ExpenseProjection | undefined> {
-    const existing = await this.getExpenseProjection(id);
-    if (!existing) return undefined;
-    
-    const updated = { ...existing, ...projection };
-    this.expenseProjections.set(id, updated);
-    return updated;
-  }
-
-  async deleteExpenseProjection(id: number): Promise<boolean> {
-    return this.expenseProjections.delete(id);
-  }
-
+  
   // Personnel Role methods
+  async getPersonnelRolesByForecastId(forecastId: number): Promise<PersonnelRole[]> {
+    return Array.from(this.personnelRoles.values()).filter(
+      (role) => role.forecastId === forecastId,
+    );
+  }
+  
+  async getPersonnelRolesByDepartmentId(departmentId: number): Promise<PersonnelRole[]> {
+    return Array.from(this.personnelRoles.values()).filter(
+      (role) => role.departmentId === departmentId,
+    );
+  }
+  
   async getPersonnelRole(id: number): Promise<PersonnelRole | undefined> {
     return this.personnelRoles.get(id);
   }
-
-  async getPersonnelRolesByWorkspaceId(workspaceId: number): Promise<PersonnelRole[]> {
-    return Array.from(this.personnelRoles.values()).filter(role => role.workspaceId === workspaceId);
-  }
-
+  
   async createPersonnelRole(insertRole: InsertPersonnelRole): Promise<PersonnelRole> {
-    const id = this.personnelRoleIdCounter++;
-    const role: PersonnelRole = { ...insertRole, id, createdAt: new Date() };
+    const id = this.currentPersonnelRoleId++;
+    const now = new Date();
+    const role: PersonnelRole = { ...insertRole, id, createdAt: now, updatedAt: now };
     this.personnelRoles.set(id, role);
     return role;
   }
-
-  async updatePersonnelRole(id: number, role: Partial<InsertPersonnelRole>): Promise<PersonnelRole | undefined> {
-    const existing = await this.getPersonnelRole(id);
-    if (!existing) return undefined;
+  
+  async updatePersonnelRole(id: number, updateData: Partial<InsertPersonnelRole>): Promise<PersonnelRole | undefined> {
+    const role = await this.getPersonnelRole(id);
+    if (!role) return undefined;
     
-    const updated = { ...existing, ...role };
-    this.personnelRoles.set(id, updated);
-    return updated;
+    const updatedRole: PersonnelRole = {
+      ...role,
+      ...updateData,
+      updatedAt: new Date()
+    };
+    
+    this.personnelRoles.set(id, updatedRole);
+    return updatedRole;
   }
-
+  
   async deletePersonnelRole(id: number): Promise<boolean> {
     return this.personnelRoles.delete(id);
   }
-
-  // Personnel Projection methods
-  async getPersonnelProjection(id: number): Promise<PersonnelProjection | undefined> {
-    return this.personnelProjections.get(id);
+  
+  // Custom Formula methods
+  async getCustomFormulasByForecastId(forecastId: number): Promise<CustomFormula[]> {
+    return Array.from(this.customFormulas.values()).filter(
+      (formula) => formula.forecastId === forecastId,
+    );
   }
-
-  async getPersonnelProjectionsByRoleId(roleId: number): Promise<PersonnelProjection[]> {
-    return Array.from(this.personnelProjections.values()).filter(projection => projection.roleId === roleId);
+  
+  async getCustomFormula(id: number): Promise<CustomFormula | undefined> {
+    return this.customFormulas.get(id);
   }
-
-  async getPersonnelProjectionsByWorkspaceId(workspaceId: number, month?: string): Promise<PersonnelProjection[]> {
-    let projections = Array.from(this.personnelProjections.values()).filter(projection => projection.workspaceId === workspaceId);
-    
-    if (month) {
-      projections = projections.filter(projection => projection.month === month);
-    }
-    
-    return projections;
-  }
-
-  async createPersonnelProjection(insertProjection: InsertPersonnelProjection): Promise<PersonnelProjection> {
-    const id = this.personnelProjectionIdCounter++;
-    const projection: PersonnelProjection = { ...insertProjection, id, createdAt: new Date() };
-    this.personnelProjections.set(id, projection);
-    return projection;
-  }
-
-  async updatePersonnelProjection(id: number, projection: Partial<InsertPersonnelProjection>): Promise<PersonnelProjection | undefined> {
-    const existing = await this.getPersonnelProjection(id);
-    if (!existing) return undefined;
-    
-    const updated = { ...existing, ...projection };
-    this.personnelProjections.set(id, updated);
-    return updated;
-  }
-
-  async deletePersonnelProjection(id: number): Promise<boolean> {
-    return this.personnelProjections.delete(id);
-  }
-
-  // Formula methods
-  async getFormula(id: number): Promise<Formula | undefined> {
-    return this.formulas.get(id);
-  }
-
-  async getFormulasByWorkspaceId(workspaceId: number): Promise<Formula[]> {
-    return Array.from(this.formulas.values()).filter(formula => formula.workspaceId === workspaceId);
-  }
-
-  async createFormula(insertFormula: InsertFormula): Promise<Formula> {
-    const id = this.formulaIdCounter++;
-    const formula: Formula = { ...insertFormula, id, createdAt: new Date() };
-    this.formulas.set(id, formula);
+  
+  async createCustomFormula(insertFormula: InsertCustomFormula): Promise<CustomFormula> {
+    const id = this.currentCustomFormulaId++;
+    const now = new Date();
+    const formula: CustomFormula = { ...insertFormula, id, createdAt: now, updatedAt: now };
+    this.customFormulas.set(id, formula);
     return formula;
   }
-
-  async updateFormula(id: number, formula: Partial<InsertFormula>): Promise<Formula | undefined> {
-    const existing = await this.getFormula(id);
-    if (!existing) return undefined;
+  
+  async updateCustomFormula(id: number, updateData: Partial<InsertCustomFormula>): Promise<CustomFormula | undefined> {
+    const formula = await this.getCustomFormula(id);
+    if (!formula) return undefined;
     
-    const updated = { ...existing, ...formula };
-    this.formulas.set(id, updated);
-    return updated;
-  }
-
-  async deleteFormula(id: number): Promise<boolean> {
-    return this.formulas.delete(id);
-  }
-
-  // Scenario methods
-  async getScenario(id: number): Promise<Scenario | undefined> {
-    return this.scenarios.get(id);
-  }
-
-  async getScenariosByWorkspaceId(workspaceId: number): Promise<Scenario[]> {
-    return Array.from(this.scenarios.values()).filter(scenario => scenario.workspaceId === workspaceId);
-  }
-
-  async getActiveScenarioByWorkspaceId(workspaceId: number): Promise<Scenario | undefined> {
-    return Array.from(this.scenarios.values()).find(scenario => scenario.workspaceId === workspaceId && scenario.isActive);
-  }
-
-  async createScenario(insertScenario: InsertScenario): Promise<Scenario> {
-    const id = this.scenarioIdCounter++;
-    const scenario: Scenario = { ...insertScenario, id, createdAt: new Date() };
+    const updatedFormula: CustomFormula = {
+      ...formula,
+      ...updateData,
+      updatedAt: new Date()
+    };
     
-    // If this is the first scenario or marked as active, ensure others are inactive
-    if (scenario.isActive) {
-      await this.deactivateAllScenarios(scenario.workspaceId);
-    }
-    
-    this.scenarios.set(id, scenario);
-    return scenario;
+    this.customFormulas.set(id, updatedFormula);
+    return updatedFormula;
   }
-
-  async updateScenario(id: number, scenario: Partial<InsertScenario>): Promise<Scenario | undefined> {
-    const existing = await this.getScenario(id);
-    if (!existing) return undefined;
-    
-    const updated = { ...existing, ...scenario };
-    
-    // If setting to active, deactivate others
-    if (scenario.isActive && scenario.isActive !== existing.isActive) {
-      await this.deactivateAllScenarios(existing.workspaceId);
-    }
-    
-    this.scenarios.set(id, updated);
-    return updated;
+  
+  async deleteCustomFormula(id: number): Promise<boolean> {
+    return this.customFormulas.delete(id);
   }
-
-  async deleteScenario(id: number): Promise<boolean> {
-    return this.scenarios.delete(id);
-  }
-
-  async setActiveScenario(id: number, workspaceId: number): Promise<boolean> {
-    const scenario = await this.getScenario(id);
-    if (!scenario || scenario.workspaceId !== workspaceId) return false;
-    
-    await this.deactivateAllScenarios(workspaceId);
-    
-    scenario.isActive = true;
-    this.scenarios.set(id, scenario);
-    return true;
-  }
-
-  private async deactivateAllScenarios(workspaceId: number): Promise<void> {
-    const scenarios = await this.getScenariosByWorkspaceId(workspaceId);
-    scenarios.forEach(scenario => {
-      scenario.isActive = false;
-      this.scenarios.set(scenario.id, scenario);
-    });
-  }
-
+  
   // QuickBooks Integration methods
-  async getQuickbooksIntegration(workspaceId: number): Promise<QuickbooksIntegration | undefined> {
-    return Array.from(this.quickbooksIntegrations.values()).find(integration => integration.workspaceId === workspaceId);
+  async getQuickbooksIntegrationByUserId(userId: number): Promise<QuickbooksIntegration | undefined> {
+    return Array.from(this.quickbooksIntegrations.values()).find(
+      (integration) => integration.userId === userId,
+    );
   }
-
-  async createOrUpdateQuickbooksIntegration(insertIntegration: InsertQuickbooksIntegration): Promise<QuickbooksIntegration> {
-    const existing = await this.getQuickbooksIntegration(insertIntegration.workspaceId);
+  
+  async createQuickbooksIntegration(insertIntegration: InsertQuickbooksIntegration): Promise<QuickbooksIntegration> {
+    const id = this.currentQuickbooksIntegrationId++;
+    const now = new Date();
+    const integration: QuickbooksIntegration = { ...insertIntegration, id, createdAt: now, updatedAt: now };
+    this.quickbooksIntegrations.set(id, integration);
+    return integration;
+  }
+  
+  async updateQuickbooksIntegration(userId: number, updateData: Partial<InsertQuickbooksIntegration>): Promise<QuickbooksIntegration | undefined> {
+    const integration = await this.getQuickbooksIntegrationByUserId(userId);
+    if (!integration) return undefined;
     
-    if (existing) {
-      const updated = { ...existing, ...insertIntegration };
-      this.quickbooksIntegrations.set(existing.id, updated);
-      return updated;
-    } else {
-      const id = this.quickbooksIntegrationIdCounter++;
-      const integration: QuickbooksIntegration = { ...insertIntegration, id, createdAt: new Date() };
-      this.quickbooksIntegrations.set(id, integration);
-      return integration;
-    }
+    const updatedIntegration: QuickbooksIntegration = {
+      ...integration,
+      ...updateData,
+      updatedAt: new Date()
+    };
+    
+    this.quickbooksIntegrations.set(integration.id, updatedIntegration);
+    return updatedIntegration;
   }
-
-  async disconnectQuickbooksIntegration(workspaceId: number): Promise<boolean> {
-    const integration = await this.getQuickbooksIntegration(workspaceId);
+  
+  async deleteQuickbooksIntegration(userId: number): Promise<boolean> {
+    const integration = await this.getQuickbooksIntegrationByUserId(userId);
     if (!integration) return false;
     
-    integration.isConnected = false;
-    integration.accessToken = undefined;
-    integration.refreshToken = undefined;
+    return this.quickbooksIntegrations.delete(integration.id);
+  }
+  
+  // Financial Projection methods
+  async getFinancialProjectionsByForecastId(forecastId: number): Promise<FinancialProjection[]> {
+    return Array.from(this.financialProjections.values()).filter(
+      (projection) => projection.forecastId === forecastId,
+    );
+  }
+  
+  async getFinancialProjection(id: number): Promise<FinancialProjection | undefined> {
+    return this.financialProjections.get(id);
+  }
+  
+  async createFinancialProjection(insertProjection: InsertFinancialProjection): Promise<FinancialProjection> {
+    const id = this.currentFinancialProjectionId++;
+    const now = new Date();
+    const projection: FinancialProjection = { ...insertProjection, id, createdAt: now, updatedAt: now };
+    this.financialProjections.set(id, projection);
+    return projection;
+  }
+  
+  async updateFinancialProjection(id: number, updateData: Partial<InsertFinancialProjection>): Promise<FinancialProjection | undefined> {
+    const projection = await this.getFinancialProjection(id);
+    if (!projection) return undefined;
     
-    this.quickbooksIntegrations.set(integration.id, integration);
-    return true;
-  }
-
-  // Transaction methods
-  async getTransaction(id: number): Promise<Transaction | undefined> {
-    return this.transactions.get(id);
-  }
-
-  async getTransactionsByWorkspaceId(workspaceId: number, limit?: number): Promise<Transaction[]> {
-    let transactions = Array.from(this.transactions.values())
-      .filter(transaction => transaction.workspaceId === workspaceId)
-      .sort((a, b) => b.date.getTime() - a.date.getTime()); // Sort by date desc
+    const updatedProjection: FinancialProjection = {
+      ...projection,
+      ...updateData,
+      updatedAt: new Date()
+    };
     
-    if (limit) {
-      transactions = transactions.slice(0, limit);
-    }
-    
-    return transactions;
+    this.financialProjections.set(id, updatedProjection);
+    return updatedProjection;
   }
-
-  async createTransaction(insertTransaction: InsertTransaction): Promise<Transaction> {
-    const id = this.transactionIdCounter++;
-    const transaction: Transaction = { ...insertTransaction, id, createdAt: new Date() };
-    this.transactions.set(id, transaction);
-    return transaction;
-  }
-
-  async deleteTransaction(id: number): Promise<boolean> {
-    return this.transactions.delete(id);
+  
+  async deleteFinancialProjection(id: number): Promise<boolean> {
+    return this.financialProjections.delete(id);
   }
 }
 

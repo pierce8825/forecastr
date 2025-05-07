@@ -1,715 +1,703 @@
-import React, { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { useToast } from "@/hooks/use-toast";
-import { Header, ToolbarHeader } from "@/components/layout/header";
-import { Sidebar } from "@/components/layout/sidebar";
-import { Card, CardContent } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { 
+  Card, 
+  CardHeader, 
+  CardTitle, 
+  CardDescription, 
+  CardContent 
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { MaterialIcon } from "@/components/ui/ui-icons";
+import { apiRequest } from "@/lib/queryClient";
 import { 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
-  Legend, 
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
   ResponsiveContainer,
-  Cell 
+  PieChart,
+  Pie,
+  Cell
 } from "recharts";
 import { 
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
-} from "@/components/ui/select";
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogDescription, 
-  DialogFooter, 
-  DialogHeader, 
-  DialogTitle 
+  Plus, 
+  Edit2, 
+  Trash2, 
+  Users,
+  UserPlus,
+  Filter
+} from "lucide-react";
+import { Helmet } from "react-helmet";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { useFinancialContext } from "@/contexts/financial-context";
+import { useToast } from "@/hooks/use-toast";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-interface PersonnelRole {
-  id: string;
-  title: string;
-  department: string;
-  baseSalary: number;
-  benefits: number;
-  taxes: number;
-  totalCost: number;
-  headcount: {
-    current: number;
-    projected: Record<string, number>;
-  };
-}
+const COLORS = ['#3B82F6', '#10B981', '#8B5CF6', '#F59E0B', '#EF4444'];
 
-const Personnel: React.FC = () => {
+const Personnel = () => {
+  const [activeTab, setActiveTab] = useState("all");
+  const [isAddDepartmentDialogOpen, setIsAddDepartmentDialogOpen] = useState(false);
+  const [isAddRoleDialogOpen, setIsAddRoleDialogOpen] = useState(false);
+  const queryClient = useQueryClient();
   const { toast } = useToast();
-  const { activeWorkspace, scenarios, setActiveScenario, activePeriod, setActivePeriod } = useFinancialContext();
-
-  // Current user
-  const [user] = useState({
-    id: 1,
-    fullName: "John Smith",
-    initials: "JS"
+  
+  // Demo user ID for MVP
+  const userId = 1;
+  
+  // Get the active forecast
+  const { data: forecasts } = useQuery({
+    queryKey: ["/api/forecasts", { userId }],
+    queryFn: async () => {
+      const res = await fetch(`/api/forecasts?userId=${userId}`);
+      if (!res.ok) throw new Error("Failed to fetch forecasts");
+      return res.json();
+    },
   });
 
-  // Active tab state
-  const [activeTab, setActiveTab] = useState("overview");
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [editingRole, setEditingRole] = useState<string | null>(null);
+  const activeForecast = forecasts?.[0];
+  const forecastId = activeForecast?.id;
 
-  // Fetch data
-  const { data: personnelData, isLoading: isLoadingPersonnel } = useQuery({
-    queryKey: ['/api/workspaces/1/personnel-roles'],
-    enabled: !!activeWorkspace
+  // Fetch departments
+  const { data: departments, isLoading: isLoadingDepartments } = useQuery({
+    queryKey: ["/api/departments", { forecastId }],
+    queryFn: async () => {
+      if (!forecastId) throw new Error("No forecast selected");
+      const res = await fetch(`/api/departments?forecastId=${forecastId}`);
+      if (!res.ok) throw new Error("Failed to fetch departments");
+      return res.json();
+    },
+    enabled: !!forecastId,
   });
 
-  const { data: headcountData, isLoading: isLoadingHeadcount } = useQuery({
-    queryKey: ['/api/workspaces/1/personnel-headcount'],
-    enabled: !!activeWorkspace
+  // Fetch personnel roles
+  const { data: personnelRoles, isLoading: isLoadingRoles } = useQuery({
+    queryKey: ["/api/personnel-roles", { forecastId }],
+    queryFn: async () => {
+      if (!forecastId) throw new Error("No forecast selected");
+      const res = await fetch(`/api/personnel-roles?forecastId=${forecastId}`);
+      if (!res.ok) throw new Error("Failed to fetch personnel roles");
+      return res.json();
+    },
+    enabled: !!forecastId,
   });
 
-  // Mock data for demonstration - in a real app, this would come from the API
-  const personnelRoles: PersonnelRole[] = [
-    {
-      id: "swe",
-      title: "Software Engineer",
-      department: "Engineering",
-      baseSalary: 120000,
-      benefits: 24000,
-      taxes: 18000,
-      totalCost: 162000,
-      headcount: {
-        current: 5,
-        projected: {
-          "Q3 2023": 5,
-          "Q4 2023": 6,
-          "Q1 2024": 7,
-          "Q2 2024": 8
-        }
-      }
+  // Mutations for departments
+  const addDepartmentMutation = useMutation({
+    mutationFn: async (newDepartment) => {
+      return await apiRequest("POST", "/api/departments", newDepartment);
     },
-    {
-      id: "pm",
-      title: "Product Manager",
-      department: "Product",
-      baseSalary: 130000,
-      benefits: 26000,
-      taxes: 19500,
-      totalCost: 175500,
-      headcount: {
-        current: 2,
-        projected: {
-          "Q3 2023": 2,
-          "Q4 2023": 2,
-          "Q1 2024": 3,
-          "Q2 2024": 3
-        }
-      }
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/departments"] });
+      setIsAddDepartmentDialogOpen(false);
+      toast({
+        title: "Department added",
+        description: "New department has been added successfully",
+      });
     },
-    {
-      id: "sales",
-      title: "Sales Representative",
-      department: "Sales",
-      baseSalary: 100000,
-      benefits: 20000,
-      taxes: 15000,
-      totalCost: 135000,
-      headcount: {
-        current: 3,
-        projected: {
-          "Q3 2023": 3,
-          "Q4 2023": 4,
-          "Q1 2024": 5,
-          "Q2 2024": 6
-        }
-      }
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: `Failed to add department: ${error.message}`,
+        variant: "destructive",
+      });
     },
-    {
-      id: "marketing",
-      title: "Marketing Specialist",
-      department: "Marketing",
-      baseSalary: 90000,
-      benefits: 18000,
-      taxes: 13500,
-      totalCost: 121500,
-      headcount: {
-        current: 2,
-        projected: {
-          "Q3 2023": 2,
-          "Q4 2023": 2,
-          "Q1 2024": 3,
-          "Q2 2024": 3
-        }
-      }
-    }
-  ];
+  });
 
-  const departmentHeadcount = [
-    { name: "Engineering", current: 5, projected: 8 },
-    { name: "Product", current: 2, projected: 3 },
-    { name: "Sales", current: 3, projected: 6 },
-    { name: "Marketing", current: 2, projected: 3 },
-    { name: "Operations", current: 1, projected: 2 },
-  ];
+  // Mutations for personnel roles
+  const addRoleMutation = useMutation({
+    mutationFn: async (newRole) => {
+      return await apiRequest("POST", "/api/personnel-roles", newRole);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/personnel-roles"] });
+      setIsAddRoleDialogOpen(false);
+      toast({
+        title: "Role added",
+        description: "New personnel role has been added successfully",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: `Failed to add role: ${error.message}`,
+        variant: "destructive",
+      });
+    },
+  });
 
-  const headcountTrend = [
-    { month: "Jul 23", headcount: 13 },
-    { month: "Aug 23", headcount: 13 },
-    { month: "Sep 23", headcount: 13 },
-    { month: "Oct 23", headcount: 14 },
-    { month: "Nov 23", headcount: 14 },
-    { month: "Dec 23", headcount: 15 },
-    { month: "Jan 24", headcount: 17 },
-    { month: "Feb 24", headcount: 18 },
-    { month: "Mar 24", headcount: 19 },
-    { month: "Apr 24", headcount: 20 },
-    { month: "May 24", headcount: 21 },
-    { month: "Jun 24", headcount: 22 }
-  ];
-
-  // Event handlers
-  const handleAddRole = () => {
-    setEditingRole(null);
-    setIsDialogOpen(true);
-  };
-
-  const handleEditRole = (id: string) => {
-    setEditingRole(id);
-    setIsDialogOpen(true);
-  };
-
-  const handleSaveRole = () => {
-    toast({
-      title: editingRole ? "Role Updated" : "Role Added",
-      description: editingRole ? `Updated role successfully` : "New role added successfully",
+  // Form handlers
+  const handleAddDepartment = (e) => {
+    e.preventDefault();
+    const formData = new FormData(e.target);
+    
+    addDepartmentMutation.mutate({
+      forecastId,
+      name: formData.get("name"),
     });
-    setIsDialogOpen(false);
   };
 
-  // Format currency
-  const formatCurrency = (value: number) => {
-    return `$${value.toLocaleString()}`;
+  const handleAddRole = (e) => {
+    e.preventDefault();
+    const formData = new FormData(e.target);
+    
+    addRoleMutation.mutate({
+      forecastId,
+      departmentId: Number(formData.get("departmentId")),
+      title: formData.get("title"),
+      count: Number(formData.get("count")),
+      plannedCount: Number(formData.get("plannedCount")),
+      annualSalary: formData.get("annualSalary"),
+      benefits: (Number(formData.get("benefits")) / 100).toString(),
+      startingMonth: Number(formData.get("startingMonth")),
+      notes: formData.get("notes"),
+    });
   };
+
+  // Process personnel data for charts
+  const departmentData = departments?.map((dept, index) => {
+    const roles = personnelRoles?.filter(role => role.departmentId === dept.id) || [];
+    const headcount = roles.reduce((sum, role) => sum + role.count, 0);
+    const annualCost = roles.reduce((sum, role) => {
+      return sum + (Number(role.annualSalary) * role.count * (1 + Number(role.benefits || 0)));
+    }, 0);
+    
+    return {
+      name: dept.name,
+      headcount,
+      annualCost,
+      color: COLORS[index % COLORS.length]
+    };
+  }) || [];
+
+  // Calculate totals
+  const totalHeadcount = departmentData.reduce((sum, dept) => sum + dept.headcount, 0);
+  const totalAnnualCost = departmentData.reduce((sum, dept) => sum + dept.annualCost, 0);
+  const avgSalary = totalHeadcount > 0 
+    ? totalAnnualCost / totalHeadcount 
+    : 0;
+
+  // Filter roles by department
+  const selectedDepartment = departments?.find(dept => dept.name === activeTab);
+  const filteredRoles = activeTab === "all" 
+    ? personnelRoles 
+    : personnelRoles?.filter(role => role.departmentId === selectedDepartment?.id);
+
+  const isLoading = isLoadingDepartments || isLoadingRoles;
 
   return (
-    <div className="h-screen flex flex-col overflow-hidden">
-      <Header user={user} />
-      
-      <div className="flex flex-1 overflow-hidden">
-        <Sidebar 
-          activeWorkspace={activeWorkspace}
-        />
+    <>
+      <Helmet>
+        <title>Personnel Planning | FinanceForge</title>
+        <meta name="description" content="Plan and forecast your personnel costs, manage departments and roles, and track headcount growth." />
+      </Helmet>
 
-        <main className="flex-1 overflow-y-auto bg-neutral-lighter">
-          <ToolbarHeader 
-            title="Personnel Planning"
-            onEdit={() => toast({ title: "Edit Personnel Settings", description: "Opening personnel settings" })}
-            scenarios={scenarios.map(s => ({ id: s.id, name: s.name }))}
-            activeScenario={scenarios.find(s => s.isActive)?.id}
-            onScenarioChange={setActiveScenario}
-            period={activePeriod}
-            onPeriodChange={setActivePeriod}
-          />
+      <div className="p-6">
+        <div className="flex justify-between items-center mb-6">
+          <div>
+            <h1 className="text-2xl font-bold">Personnel Planning</h1>
+            <p className="text-muted-foreground">Plan and forecast your team structure and costs</p>
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => setIsAddDepartmentDialogOpen(true)}>
+              <Plus className="mr-2 h-4 w-4" /> Add Department
+            </Button>
+            <Button onClick={() => setIsAddRoleDialogOpen(true)}>
+              <UserPlus className="mr-2 h-4 w-4" /> Add Role
+            </Button>
+          </div>
+        </div>
 
-          <div className="p-6 max-w-7xl mx-auto">
-            <Tabs defaultValue="overview" className="mb-8" onValueChange={setActiveTab}>
-              <TabsList className="grid grid-cols-3 w-full max-w-md mb-6">
-                <TabsTrigger value="overview">Overview</TabsTrigger>
-                <TabsTrigger value="roles">Roles & Salaries</TabsTrigger>
-                <TabsTrigger value="planning">Headcount Planning</TabsTrigger>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg">Total Headcount</CardTitle>
+              <CardDescription>Current employees</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold text-gray-900">
+                {totalHeadcount}
+              </div>
+              <p className="text-sm text-muted-foreground mt-1">
+                Across {departments?.length || 0} departments
+              </p>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg">Average Salary</CardTitle>
+              <CardDescription>Per employee</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold text-gray-900 font-tabular">
+                ${Math.round(avgSalary).toLocaleString()}
+              </div>
+              <p className="text-sm text-muted-foreground mt-1">
+                Including benefits
+              </p>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg">Annual Personnel Cost</CardTitle>
+              <CardDescription>All departments</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold text-gray-900 font-tabular">
+                ${Math.round(totalAnnualCost).toLocaleString()}
+              </div>
+              <p className="text-sm text-muted-foreground mt-1">
+                ${Math.round(totalAnnualCost / 12).toLocaleString()} monthly
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Department Headcount</CardTitle>
+              <CardDescription>Distribution by department</CardDescription>
+            </CardHeader>
+            <CardContent className="pt-0">
+              <div className="h-64">
+                {isLoading ? (
+                  <div className="h-full flex items-center justify-center">
+                    <p>Loading department data...</p>
+                  </div>
+                ) : departmentData.length === 0 ? (
+                  <div className="h-full flex items-center justify-center text-center">
+                    <div>
+                      <p className="text-muted-foreground mb-2">No department data available</p>
+                      <Button size="sm" onClick={() => setIsAddDepartmentDialogOpen(true)}>
+                        <Plus className="mr-2 h-4 w-4" /> Add Your First Department
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart
+                      data={departmentData}
+                      layout="vertical"
+                      margin={{ top: 20, right: 30, left: 50, bottom: 5 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis type="number" />
+                      <YAxis type="category" dataKey="name" width={100} />
+                      <Tooltip formatter={(value) => [`${value} employees`, ""]} />
+                      <Legend />
+                      <Bar dataKey="headcount" name="Headcount" fill="#3B82F6" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardHeader>
+              <CardTitle>Cost Distribution</CardTitle>
+              <CardDescription>Personnel cost by department</CardDescription>
+            </CardHeader>
+            <CardContent className="pt-0">
+              <div className="h-64">
+                {isLoading ? (
+                  <div className="h-full flex items-center justify-center">
+                    <p>Loading personnel cost data...</p>
+                  </div>
+                ) : departmentData.length === 0 ? (
+                  <div className="h-full flex items-center justify-center text-center">
+                    <div>
+                      <p className="text-muted-foreground mb-2">No cost data available</p>
+                      <Button size="sm" onClick={() => setIsAddRoleDialogOpen(true)}>
+                        <Plus className="mr-2 h-4 w-4" /> Add Your First Role
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={departmentData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={60}
+                        outerRadius={90}
+                        paddingAngle={5}
+                        dataKey="annualCost"
+                        nameKey="name"
+                        label={({ name, percent }) => 
+                          `${name}: ${(percent * 100).toFixed(0)}%`
+                        }
+                      >
+                        {departmentData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip formatter={(value) => [`$${Number(value).toLocaleString()}`, ""]} />
+                      <Legend />
+                    </PieChart>
+                  </ResponsiveContainer>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle>Personnel Roles</CardTitle>
+              <CardDescription>
+                Manage your team structure and costs
+              </CardDescription>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Button variant="outline" size="sm" onClick={() => setIsAddDepartmentDialogOpen(true)}>
+                <Plus className="mr-2 h-4 w-4" />
+                Department
+              </Button>
+              <Button size="sm" onClick={() => setIsAddRoleDialogOpen(true)}>
+                <UserPlus className="mr-2 h-4 w-4" />
+                Role
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+              <TabsList className="mb-4 w-full justify-start overflow-x-auto">
+                <TabsTrigger value="all">All Departments</TabsTrigger>
+                {departments?.map((department) => (
+                  <TabsTrigger key={department.id} value={department.name} className="min-w-[100px]">
+                    {department.name}
+                  </TabsTrigger>
+                ))}
               </TabsList>
               
-              <TabsContent value="overview" className="space-y-8">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                  <Card className="bg-white rounded-lg shadow-sm p-5 border border-neutral-light">
-                    <CardContent className="p-0">
-                      <div className="flex justify-between items-center mb-6">
-                        <h3 className="font-medium text-neutral-darker">Department Headcount</h3>
-                        <div className="flex space-x-2">
-                          <button className="text-neutral-dark hover:text-primary p-1">
-                            <MaterialIcon name="filter_list" />
-                          </button>
-                          <button className="text-neutral-dark hover:text-primary p-1">
-                            <MaterialIcon name="more_horiz" />
-                          </button>
-                        </div>
-                      </div>
+              <TabsContent value={activeTab}>
+                {isLoading ? (
+                  <div className="h-40 flex items-center justify-center">
+                    <p>Loading personnel data...</p>
+                  </div>
+                ) : filteredRoles?.length === 0 ? (
+                  <div className="text-center py-8">
+                    <p className="text-muted-foreground mb-4">No personnel roles found</p>
+                    <Button onClick={() => setIsAddRoleDialogOpen(true)}>
+                      <UserPlus className="mr-2 h-4 w-4" /> Add Personnel Role
+                    </Button>
+                  </div>
+                ) : (
+                  <>
+                    {departments?.map((department) => {
+                      // Skip departments with no roles or if not viewing all departments and this isn't the selected one
+                      const departmentRoles = personnelRoles?.filter(role => role.departmentId === department.id) || [];
+                      if (departmentRoles.length === 0 || (activeTab !== "all" && department.name !== activeTab)) {
+                        return null;
+                      }
                       
-                      <div className="chart-container" style={{ height: "300px" }}>
-                        {isLoadingHeadcount ? (
-                          <div className="h-full w-full bg-neutral-lighter rounded animate-pulse"></div>
-                        ) : (
-                          <ResponsiveContainer width="100%" height="100%">
-                            <BarChart
-                              data={headcountData?.departments || departmentHeadcount}
-                              margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-                              layout="vertical"
-                              barGap={6}
-                              barSize={16}
-                            >
-                              <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
-                              <XAxis type="number" />
-                              <YAxis dataKey="name" type="category" />
-                              <Tooltip formatter={(value) => value} />
-                              <Legend />
-                              <Bar dataKey="current" name="Current" fill="#0078D4" radius={[0, 0, 0, 0]} />
-                              <Bar dataKey="projected" name="Projected (12m)" fill="#EDEBE9" radius={[0, 0, 0, 0]} />
-                            </BarChart>
-                          </ResponsiveContainer>
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
-                  
-                  <Card className="bg-white rounded-lg shadow-sm p-5 border border-neutral-light">
-                    <CardContent className="p-0">
-                      <div className="flex justify-between items-center mb-6">
-                        <h3 className="font-medium text-neutral-darker">Headcount Trend</h3>
-                        <div className="flex space-x-2">
-                          <button className="text-neutral-dark hover:text-primary p-1">
-                            <MaterialIcon name="filter_list" />
-                          </button>
-                          <button className="text-neutral-dark hover:text-primary p-1">
-                            <MaterialIcon name="more_horiz" />
-                          </button>
-                        </div>
-                      </div>
+                      // Calculate department totals
+                      const headcount = departmentRoles.reduce((sum, role) => sum + role.count, 0);
+                      const plannedHeadcount = departmentRoles.reduce((sum, role) => sum + role.plannedCount, 0);
+                      const avgSalary = departmentRoles.reduce((sum, role) => sum + Number(role.annualSalary), 0) / departmentRoles.length;
+                      const monthlyCost = departmentRoles.reduce((sum, role) => {
+                        const monthlySalary = Number(role.annualSalary) / 12;
+                        const benefits = Number(role.benefits || 0);
+                        return sum + (monthlySalary * (1 + benefits) * role.count);
+                      }, 0);
+                      const annualCost = monthlyCost * 12;
                       
-                      <div className="chart-container" style={{ height: "300px" }}>
-                        {isLoadingHeadcount ? (
-                          <div className="h-full w-full bg-neutral-lighter rounded animate-pulse"></div>
-                        ) : (
-                          <ResponsiveContainer width="100%" height="100%">
-                            <BarChart
-                              data={headcountData?.trend || headcountTrend}
-                              margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-                              barSize={20}
-                            >
-                              <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                              <XAxis dataKey="month" />
-                              <YAxis domain={[0, 'dataMax + 5']} />
-                              <Tooltip />
-                              <Bar dataKey="headcount" name="Headcount" fill="#0078D4">
-                                {(headcountData?.trend || headcountTrend).map((entry, index) => (
-                                  <Cell key={`cell-${index}`} fill={index < 3 ? "#0078D4" : "#EDEBE9"} />
+                      return (
+                        <div key={department.id} className="mb-8">
+                          {activeTab === "all" && (
+                            <div className="flex items-center justify-between mb-4">
+                              <h3 className="text-lg font-semibold text-gray-800 flex items-center">
+                                <span 
+                                  className="w-3 h-3 rounded-full mr-2"
+                                  style={{
+                                    backgroundColor: COLORS[departments.findIndex(d => d.id === department.id) % COLORS.length]
+                                  }}
+                                ></span>
+                                {department.name}
+                              </h3>
+                              <span className="text-sm text-gray-500">{departmentRoles.length} roles</span>
+                            </div>
+                          )}
+                          
+                          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+                            <div className="bg-gray-50 rounded-md p-3">
+                              <div className="text-xs text-gray-500 mb-1">Headcount</div>
+                              <div className="text-sm font-medium text-gray-900">
+                                {headcount} / {plannedHeadcount}
+                              </div>
+                            </div>
+                            <div className="bg-gray-50 rounded-md p-3">
+                              <div className="text-xs text-gray-500 mb-1">Avg. Salary</div>
+                              <div className="text-sm font-medium text-gray-900 font-tabular">
+                                ${Math.round(avgSalary).toLocaleString()}
+                              </div>
+                            </div>
+                            <div className="bg-gray-50 rounded-md p-3">
+                              <div className="text-xs text-gray-500 mb-1">Monthly Cost</div>
+                              <div className="text-sm font-medium text-gray-900 font-tabular">
+                                ${Math.round(monthlyCost).toLocaleString()}
+                              </div>
+                            </div>
+                            <div className="bg-gray-50 rounded-md p-3">
+                              <div className="text-xs text-gray-500 mb-1">Annual Cost</div>
+                              <div className="text-sm font-medium text-gray-900 font-tabular">
+                                ${Math.round(annualCost).toLocaleString()}
+                              </div>
+                            </div>
+                          </div>
+                          
+                          <div className="overflow-x-auto">
+                            <table className="w-full">
+                              <thead>
+                                <tr className="border-b">
+                                  <th className="py-3 px-2 text-left">Title</th>
+                                  <th className="py-3 px-2 text-right">Headcount</th>
+                                  <th className="py-3 px-2 text-right">Annual Salary</th>
+                                  <th className="py-3 px-2 text-right">Benefits</th>
+                                  <th className="py-3 px-2 text-right">Start</th>
+                                  <th className="py-3 px-2 text-right">Actions</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {departmentRoles.map((role) => (
+                                  <tr key={role.id} className="border-b hover:bg-gray-50">
+                                    <td className="py-3 px-2">{role.title}</td>
+                                    <td className="py-3 px-2 text-right">
+                                      {role.count} / {role.plannedCount}
+                                    </td>
+                                    <td className="py-3 px-2 text-right font-tabular">
+                                      ${Number(role.annualSalary).toLocaleString()}
+                                    </td>
+                                    <td className="py-3 px-2 text-right">
+                                      {(Number(role.benefits) * 100).toFixed(0)}%
+                                    </td>
+                                    <td className="py-3 px-2 text-right">
+                                      {role.startingMonth ? (
+                                        new Date(2023, role.startingMonth - 1).toLocaleString('default', { month: 'short' })
+                                      ) : 'Jan'}
+                                    </td>
+                                    <td className="py-3 px-2 text-right">
+                                      <div className="flex justify-end gap-2">
+                                        <Button variant="ghost" size="icon">
+                                          <Edit2 className="h-4 w-4" />
+                                        </Button>
+                                        <Button variant="ghost" size="icon">
+                                          <Trash2 className="h-4 w-4" />
+                                        </Button>
+                                      </div>
+                                    </td>
+                                  </tr>
                                 ))}
-                              </Bar>
-                            </BarChart>
-                          </ResponsiveContainer>
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
-                </div>
-
-                <Card className="bg-white rounded-lg shadow-sm p-5 border border-neutral-light">
-                  <CardContent className="p-0">
-                    <h3 className="font-medium text-neutral-darker mb-6">Personnel Summary</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                      <div className="bg-neutral-lighter p-4 rounded-md">
-                        <h4 className="text-sm font-medium text-neutral-dark mb-2">Current Headcount</h4>
-                        <div className="text-2xl font-semibold text-neutral-darker">13</div>
-                        <div className="text-sm text-success mt-1">+2 since beginning of year</div>
-                      </div>
-                      <div className="bg-neutral-lighter p-4 rounded-md">
-                        <h4 className="text-sm font-medium text-neutral-dark mb-2">Annual Personnel Cost</h4>
-                        <div className="text-2xl font-semibold text-neutral-darker">$1.78M</div>
-                        <div className="text-sm text-warning mt-1">+15.3% vs. last year</div>
-                      </div>
-                      <div className="bg-neutral-lighter p-4 rounded-md">
-                        <h4 className="text-sm font-medium text-neutral-dark mb-2">Cost per Employee</h4>
-                        <div className="text-2xl font-semibold text-neutral-darker">$137K</div>
-                        <div className="text-sm text-neutral-dark mt-1">Annual average</div>
-                      </div>
-                      <div className="bg-neutral-lighter p-4 rounded-md">
-                        <h4 className="text-sm font-medium text-neutral-dark mb-2">Projected Headcount (EOY)</h4>
-                        <div className="text-2xl font-semibold text-neutral-darker">15</div>
-                        <div className="text-sm text-success mt-1">+15.4% growth</div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-              
-              <TabsContent value="roles" className="space-y-4">
-                <div className="flex justify-between items-center mb-4">
-                  <h3 className="text-lg font-medium text-neutral-darker">Roles & Salaries</h3>
-                  <Button onClick={handleAddRole}>
-                    <MaterialIcon name="add_circle" className="mr-2" />
-                    Add Role
-                  </Button>
-                </div>
-                
-                <Card className="bg-white shadow-sm border border-neutral-light">
-                  <CardContent className="p-4">
-                    {isLoadingPersonnel ? (
-                      <div className="animate-pulse">
-                        <div className="h-10 bg-neutral-lighter rounded w-full mb-4"></div>
-                        <div className="space-y-4">
-                          {[1, 2, 3, 4].map((i) => (
-                            <div key={i} className="h-16 bg-neutral-lighter rounded w-full"></div>
-                          ))}
+                              </tbody>
+                            </table>
+                          </div>
                         </div>
-                      </div>
-                    ) : (
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Role / Title</TableHead>
-                            <TableHead>Department</TableHead>
-                            <TableHead className="text-right">Base Salary</TableHead>
-                            <TableHead className="text-right">Benefits</TableHead>
-                            <TableHead className="text-right">Taxes</TableHead>
-                            <TableHead className="text-right">Total Cost</TableHead>
-                            <TableHead className="text-center">Actions</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {(personnelData?.roles || personnelRoles).map((role) => (
-                            <TableRow key={role.id}>
-                              <TableCell className="font-medium">{role.title}</TableCell>
-                              <TableCell>{role.department}</TableCell>
-                              <TableCell className="text-right">{formatCurrency(role.baseSalary)}</TableCell>
-                              <TableCell className="text-right">{formatCurrency(role.benefits)}</TableCell>
-                              <TableCell className="text-right">{formatCurrency(role.taxes)}</TableCell>
-                              <TableCell className="text-right font-medium">{formatCurrency(role.totalCost)}</TableCell>
-                              <TableCell className="text-center">
-                                <button 
-                                  className="text-primary hover:text-primary-dark mr-2"
-                                  onClick={() => handleEditRole(role.id)}
-                                >
-                                  <MaterialIcon name="edit" />
-                                </button>
-                                <button 
-                                  className="text-neutral-dark hover:text-primary"
-                                  onClick={() => toast({ title: "Duplicate Role", description: `Duplicating ${role.title}` })}
-                                >
-                                  <MaterialIcon name="filter_list" />
-                                </button>
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    )}
-                  </CardContent>
-                </Card>
-                
-                <Card className="bg-white shadow-sm border border-neutral-light">
-                  <CardContent className="p-4">
-                    <h3 className="font-medium text-neutral-darker mb-4">Cost Structure Settings</h3>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-                      <div>
-                        <label className="block text-sm font-medium text-neutral-dark mb-2">
-                          Default Benefits (% of Salary)
-                        </label>
-                        <Input 
-                          type="number" 
-                          defaultValue="20" 
-                          className="border-neutral-light"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-neutral-dark mb-2">
-                          Default Taxes (% of Salary)
-                        </label>
-                        <Input 
-                          type="number" 
-                          defaultValue="15" 
-                          className="border-neutral-light"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-neutral-dark mb-2">
-                          Annual Salary Increase (%)
-                        </label>
-                        <Input 
-                          type="number" 
-                          defaultValue="3" 
-                          className="border-neutral-light"
-                        />
-                      </div>
-                    </div>
-                    
-                    <div className="flex justify-end">
-                      <Button 
-                        onClick={() => toast({ title: "Update Settings", description: "Cost structure settings updated" })}
-                      >
-                        Update
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-              
-              <TabsContent value="planning" className="space-y-4">
-                <div className="flex justify-between items-center mb-4">
-                  <h3 className="text-lg font-medium text-neutral-darker">Headcount Planning</h3>
-                  <Button onClick={() => toast({ title: "Generate Plan", description: "Generating headcount plan" })}>
-                    <MaterialIcon name="trending_up" className="mr-2" />
-                    Generate Plan
-                  </Button>
-                </div>
-                
-                <Card className="bg-white shadow-sm border border-neutral-light">
-                  <CardContent className="p-4">
-                    <h3 className="font-medium text-neutral-darker mb-4">Headcount Projections</h3>
-                    
-                    {isLoadingPersonnel ? (
-                      <div className="animate-pulse">
-                        <div className="h-10 bg-neutral-lighter rounded w-full mb-4"></div>
-                        <div className="space-y-4">
-                          {[1, 2, 3, 4].map((i) => (
-                            <div key={i} className="h-16 bg-neutral-lighter rounded w-full"></div>
-                          ))}
-                        </div>
-                      </div>
-                    ) : (
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Role / Title</TableHead>
-                            <TableHead className="text-center">Current</TableHead>
-                            <TableHead className="text-center">Q3 2023</TableHead>
-                            <TableHead className="text-center">Q4 2023</TableHead>
-                            <TableHead className="text-center">Q1 2024</TableHead>
-                            <TableHead className="text-center">Q2 2024</TableHead>
-                            <TableHead className="text-center">Actions</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {(personnelData?.roles || personnelRoles).map((role) => (
-                            <TableRow key={role.id}>
-                              <TableCell className="font-medium">{role.title}</TableCell>
-                              <TableCell className="text-center">{role.headcount.current}</TableCell>
-                              <TableCell className="text-center">{role.headcount.projected["Q3 2023"]}</TableCell>
-                              <TableCell className="text-center">{role.headcount.projected["Q4 2023"]}</TableCell>
-                              <TableCell className="text-center">{role.headcount.projected["Q1 2024"]}</TableCell>
-                              <TableCell className="text-center">{role.headcount.projected["Q2 2024"]}</TableCell>
-                              <TableCell className="text-center">
-                                <button 
-                                  className="text-primary hover:text-primary-dark"
-                                  onClick={() => toast({ title: "Edit Projections", description: `Editing projections for ${role.title}` })}
-                                >
-                                  <MaterialIcon name="edit" />
-                                </button>
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    )}
-                  </CardContent>
-                </Card>
-                
-                <Card className="bg-white shadow-sm border border-neutral-light">
-                  <CardContent className="p-4">
-                    <h3 className="font-medium text-neutral-darker mb-4">Planning Parameters</h3>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-                      <div>
-                        <label className="block text-sm font-medium text-neutral-dark mb-2">
-                          Hiring Lead Time (days)
-                        </label>
-                        <Input 
-                          type="number" 
-                          defaultValue="60" 
-                          className="border-neutral-light"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-neutral-dark mb-2">
-                          Default Ramp-up (months)
-                        </label>
-                        <Input 
-                          type="number" 
-                          defaultValue="3" 
-                          className="border-neutral-light"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-neutral-dark mb-2">
-                          Revenue-to-Headcount Ratio
-                        </label>
-                        <Input 
-                          type="number" 
-                          defaultValue="250000" 
-                          className="border-neutral-light"
-                        />
-                      </div>
-                    </div>
-                    
-                    <div className="flex justify-end">
-                      <Button 
-                        onClick={() => toast({ title: "Update Parameters", description: "Planning parameters updated" })}
-                      >
-                        Update
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-                
-                <Card className="bg-white shadow-sm border border-neutral-light">
-                  <CardContent className="p-4">
-                    <div className="flex justify-between items-center mb-6">
-                      <h3 className="font-medium text-neutral-darker">Personnel Cost Forecast</h3>
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        onClick={() => toast({ title: "Export Forecast", description: "Exporting personnel cost forecast" })}
-                      >
-                        Export
-                      </Button>
-                    </div>
-                    
-                    <div className="chart-container" style={{ height: "300px" }}>
-                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart
-                          data={[
-                            { month: "Jul 23", cost: 156000 },
-                            { month: "Aug 23", cost: 156000 },
-                            { month: "Sep 23", cost: 156000 },
-                            { month: "Oct 23", cost: 168000 },
-                            { month: "Nov 23", cost: 168000 },
-                            { month: "Dec 23", cost: 180000 },
-                            { month: "Jan 24", cost: 216000 },
-                            { month: "Feb 24", cost: 228000 },
-                            { month: "Mar 24", cost: 240000 },
-                            { month: "Apr 24", cost: 252000 },
-                            { month: "May 24", cost: 264000 },
-                            { month: "Jun 24", cost: 276000 }
-                          ]}
-                          margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-                        >
-                          <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                          <XAxis dataKey="month" />
-                          <YAxis tickFormatter={(value) => `$${value/1000}k`} />
-                          <Tooltip formatter={(value) => formatCurrency(value as number)} />
-                          <Bar dataKey="cost" name="Personnel Cost" fill="#0078D4">
-                            {[0, 1, 2].map((index) => (
-                              <Cell key={`cell-${index}`} fill="#0078D4" />
-                            ))}
-                            {[3, 4, 5, 6, 7, 8, 9, 10, 11].map((index) => (
-                              <Cell key={`cell-${index}`} fill="#EDEBE9" />
-                            ))}
-                          </Bar>
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </div>
-                  </CardContent>
-                </Card>
+                      );
+                    })}
+                  </>
+                )}
               </TabsContent>
             </Tabs>
-          </div>
-        </main>
+          </CardContent>
+        </Card>
       </div>
 
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="sm:max-w-[500px]">
+      {/* Add Department Dialog */}
+      <Dialog open={isAddDepartmentDialogOpen} onOpenChange={setIsAddDepartmentDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
-            <DialogTitle>{editingRole ? "Edit Role" : "Add Role"}</DialogTitle>
+            <DialogTitle>Add Department</DialogTitle>
             <DialogDescription>
-              {editingRole 
-                ? "Update the details for this role" 
-                : "Create a new role to add to your personnel plans"}
+              Add a new department to your organization structure.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="title">Role / Title</Label>
-              <Input 
-                id="title" 
-                defaultValue={editingRole ? personnelRoles.find(r => r.id === editingRole)?.title : ""} 
-                placeholder="e.g., Software Engineer, Product Manager" 
-                className="border-neutral-light"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="department">Department</Label>
-              <Select defaultValue={editingRole ? personnelRoles.find(r => r.id === editingRole)?.department : "Engineering"}>
-                <SelectTrigger className="border-neutral-light">
-                  <SelectValue placeholder="Select a department" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Engineering">Engineering</SelectItem>
-                  <SelectItem value="Product">Product</SelectItem>
-                  <SelectItem value="Sales">Sales</SelectItem>
-                  <SelectItem value="Marketing">Marketing</SelectItem>
-                  <SelectItem value="Operations">Operations</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="baseSalary">Base Salary ($)</Label>
-                <Input 
-                  id="baseSalary" 
-                  type="number" 
-                  defaultValue={editingRole ? personnelRoles.find(r => r.id === editingRole)?.baseSalary : ""} 
-                  placeholder="e.g., 120000" 
-                  className="border-neutral-light"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="benefits">Benefits (% of Salary)</Label>
-                <Input 
-                  id="benefits" 
-                  type="number" 
-                  defaultValue="20" 
-                  placeholder="e.g., 20" 
-                  className="border-neutral-light"
-                />
+          <form onSubmit={handleAddDepartment}>
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="name" className="text-right">
+                  Department Name
+                </Label>
+                <Input id="name" name="name" className="col-span-3" required />
               </div>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="taxes">Taxes (% of Salary)</Label>
-                <Input 
-                  id="taxes" 
-                  type="number" 
-                  defaultValue="15" 
-                  placeholder="e.g., 15" 
-                  className="border-neutral-light"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="headcount">Current Headcount</Label>
-                <Input 
-                  id="headcount" 
-                  type="number" 
-                  defaultValue={editingRole ? personnelRoles.find(r => r.id === editingRole)?.headcount.current : "1"} 
-                  placeholder="e.g., 1" 
-                  className="border-neutral-light"
-                />
-              </div>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsDialogOpen(false)}>Cancel</Button>
-            <Button onClick={handleSaveRole}>Save</Button>
-          </DialogFooter>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setIsAddDepartmentDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={addDepartmentMutation.isPending}>
+                {addDepartmentMutation.isPending ? "Adding..." : "Add Department"}
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
-    </div>
+
+      {/* Add Role Dialog */}
+      <Dialog open={isAddRoleDialogOpen} onOpenChange={setIsAddRoleDialogOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Add Personnel Role</DialogTitle>
+            <DialogDescription>
+              Add a new role to your personnel plan.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleAddRole}>
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="departmentId" className="text-right">
+                  Department
+                </Label>
+                <Select name="departmentId" defaultValue={selectedDepartment?.id?.toString() || ""} required>
+                  <SelectTrigger className="col-span-3">
+                    <SelectValue placeholder="Select department" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {departments?.map(dept => (
+                      <SelectItem key={dept.id} value={dept.id.toString()}>
+                        {dept.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="title" className="text-right">
+                  Job Title
+                </Label>
+                <Input id="title" name="title" className="col-span-3" required />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="count" className="text-right">
+                  Current Count
+                </Label>
+                <Input
+                  id="count"
+                  name="count"
+                  type="number"
+                  min="0"
+                  className="col-span-3"
+                  required
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="plannedCount" className="text-right">
+                  Planned Count
+                </Label>
+                <Input
+                  id="plannedCount"
+                  name="plannedCount"
+                  type="number"
+                  min="0"
+                  className="col-span-3"
+                  required
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="annualSalary" className="text-right">
+                  Annual Salary
+                </Label>
+                <div className="col-span-3 flex">
+                  <span className="inline-flex items-center px-3 rounded-l-md border border-r-0 border-gray-300 bg-gray-50 text-gray-500 sm:text-sm">
+                    $
+                  </span>
+                  <Input
+                    id="annualSalary"
+                    name="annualSalary"
+                    type="number"
+                    min="0"
+                    step="1000"
+                    className="rounded-l-none"
+                    required
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="benefits" className="text-right">
+                  Benefits %
+                </Label>
+                <div className="col-span-3 flex">
+                  <Input
+                    id="benefits"
+                    name="benefits"
+                    type="number"
+                    min="0"
+                    max="100"
+                    defaultValue="20"
+                    className="rounded-r-none"
+                    required
+                  />
+                  <span className="inline-flex items-center px-3 rounded-r-md border border-l-0 border-gray-300 bg-gray-50 text-gray-500 sm:text-sm">
+                    %
+                  </span>
+                </div>
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="startingMonth" className="text-right">
+                  Starting Month
+                </Label>
+                <Select name="startingMonth" defaultValue="1">
+                  <SelectTrigger className="col-span-3">
+                    <SelectValue placeholder="Select month" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="1">January</SelectItem>
+                    <SelectItem value="2">February</SelectItem>
+                    <SelectItem value="3">March</SelectItem>
+                    <SelectItem value="4">April</SelectItem>
+                    <SelectItem value="5">May</SelectItem>
+                    <SelectItem value="6">June</SelectItem>
+                    <SelectItem value="7">July</SelectItem>
+                    <SelectItem value="8">August</SelectItem>
+                    <SelectItem value="9">September</SelectItem>
+                    <SelectItem value="10">October</SelectItem>
+                    <SelectItem value="11">November</SelectItem>
+                    <SelectItem value="12">December</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="notes" className="text-right">
+                  Notes
+                </Label>
+                <Input id="notes" name="notes" className="col-span-3" />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setIsAddRoleDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={addRoleMutation.isPending}>
+                {addRoleMutation.isPending ? "Adding..." : "Add Role"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 };
 

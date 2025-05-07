@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, numeric, timestamp, boolean, json, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, jsonb, numeric, timestamp, boolean } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -8,223 +8,224 @@ export const users = pgTable("users", {
   username: text("username").notNull().unique(),
   password: text("password").notNull(),
   email: text("email").notNull().unique(),
-  fullName: text("full_name"),
   companyName: text("company_name"),
-  createdAt: timestamp("created_at").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
-export const insertUserSchema = createInsertSchema(users).omit({
+export const insertUserSchema = createInsertSchema(users).omit({ 
   id: true,
   createdAt: true,
 });
 
-// Workspaces
-export const workspaces = pgTable("workspaces", {
+// Forecast schema
+export const forecasts = pgTable("forecasts", {
   id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
   name: text("name").notNull(),
   description: text("description"),
-  ownerId: integer("owner_id").notNull(),
-  createdAt: timestamp("created_at").defaultNow(),
+  currency: text("currency").default("USD"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
-export const insertWorkspaceSchema = createInsertSchema(workspaces).omit({
+export const insertForecastSchema = createInsertSchema(forecasts).omit({
   id: true,
   createdAt: true,
+  updatedAt: true,
 });
 
-// Revenue streams
+// Revenue Driver schema
+export const revenueDrivers = pgTable("revenue_drivers", {
+  id: serial("id").primaryKey(),
+  forecastId: integer("forecast_id").notNull(),
+  name: text("name").notNull(),
+  value: numeric("value", { precision: 15, scale: 2 }).notNull(),
+  unit: text("unit"),
+  minValue: numeric("min_value", { precision: 15, scale: 2 }),
+  maxValue: numeric("max_value", { precision: 15, scale: 2 }),
+  growthRate: numeric("growth_rate", { precision: 6, scale: 4 }),
+  category: text("category"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertRevenueDriverSchema = createInsertSchema(revenueDrivers).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+// Revenue Stream schema
 export const revenueStreams = pgTable("revenue_streams", {
   id: serial("id").primaryKey(),
-  workspaceId: integer("workspace_id").notNull(),
+  forecastId: integer("forecast_id").notNull(),
   name: text("name").notNull(),
-  type: text("type").notNull(), // subscription, one-time, etc.
-  description: text("description"),
-  createdAt: timestamp("created_at").defaultNow(),
+  type: text("type").notNull(), // subscription, one-time, service
+  amount: numeric("amount", { precision: 15, scale: 2 }).notNull(),
+  frequency: text("frequency"), // monthly, quarterly, annual
+  growthRate: numeric("growth_rate", { precision: 6, scale: 4 }),
+  startDate: timestamp("start_date"),
+  endDate: timestamp("end_date"),
+  category: text("category"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
 export const insertRevenueStreamSchema = createInsertSchema(revenueStreams).omit({
   id: true,
   createdAt: true,
+  updatedAt: true,
 });
 
-// Revenue projections by month
-export const revenueProjections = pgTable("revenue_projections", {
+// Expense schema
+export const expenses = pgTable("expenses", {
   id: serial("id").primaryKey(),
-  streamId: integer("stream_id").notNull(),
-  workspaceId: integer("workspace_id").notNull(),
-  month: text("month").notNull(), // YYYY-MM format
-  amount: numeric("amount").notNull(),
-  isActual: boolean("is_actual").default(false),
-  createdAt: timestamp("created_at").defaultNow(),
-});
-
-export const insertRevenueProjectionSchema = createInsertSchema(revenueProjections).omit({
-  id: true,
-  createdAt: true,
-});
-
-// Expense categories
-export const expenseCategories = pgTable("expense_categories", {
-  id: serial("id").primaryKey(),
-  workspaceId: integer("workspace_id").notNull(),
+  forecastId: integer("forecast_id").notNull(),
   name: text("name").notNull(),
-  description: text("description"),
-  createdAt: timestamp("created_at").defaultNow(),
+  amount: numeric("amount", { precision: 15, scale: 2 }).notNull(),
+  frequency: text("frequency").notNull(), // one-time, monthly, quarterly, annual
+  category: text("category"), // marketing, software, office, etc.
+  isCogsRelated: boolean("is_cogs_related").default(false),
+  startDate: timestamp("start_date"),
+  endDate: timestamp("end_date"),
+  growthRate: numeric("growth_rate", { precision: 6, scale: 4 }),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
-export const insertExpenseCategorySchema = createInsertSchema(expenseCategories).omit({
+export const insertExpenseSchema = createInsertSchema(expenses).omit({
   id: true,
   createdAt: true,
+  updatedAt: true,
 });
 
-// Expense projections by month
-export const expenseProjections = pgTable("expense_projections", {
+// Department schema
+export const departments = pgTable("departments", {
   id: serial("id").primaryKey(),
-  categoryId: integer("category_id").notNull(),
-  workspaceId: integer("workspace_id").notNull(),
-  month: text("month").notNull(), // YYYY-MM format
-  amount: numeric("amount").notNull(),
-  isActual: boolean("is_actual").default(false),
-  createdAt: timestamp("created_at").defaultNow(),
+  forecastId: integer("forecast_id").notNull(),
+  name: text("name").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
-export const insertExpenseProjectionSchema = createInsertSchema(expenseProjections).omit({
+export const insertDepartmentSchema = createInsertSchema(departments).omit({
   id: true,
   createdAt: true,
+  updatedAt: true,
 });
 
-// Personnel roles
+// Personnel schema
 export const personnelRoles = pgTable("personnel_roles", {
   id: serial("id").primaryKey(),
-  workspaceId: integer("workspace_id").notNull(),
+  forecastId: integer("forecast_id").notNull(),
+  departmentId: integer("department_id").notNull(),
   title: text("title").notNull(),
-  department: text("department"),
-  baseSalary: numeric("base_salary").notNull(),
-  benefits: numeric("benefits").default("0"),
-  taxes: numeric("taxes").default("0"),
-  createdAt: timestamp("created_at").defaultNow(),
+  count: integer("count").notNull(),
+  plannedCount: integer("planned_count").notNull(),
+  annualSalary: numeric("annual_salary", { precision: 12, scale: 2 }).notNull(),
+  startingMonth: integer("starting_month"), // month number (1-12)
+  benefits: numeric("benefits", { precision: 5, scale: 4 }), // percentage of salary
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
 export const insertPersonnelRoleSchema = createInsertSchema(personnelRoles).omit({
   id: true,
   createdAt: true,
+  updatedAt: true,
 });
 
-// Personnel headcount projections
-export const personnelProjections = pgTable("personnel_projections", {
+// Custom Formula schema
+export const customFormulas = pgTable("custom_formulas", {
   id: serial("id").primaryKey(),
-  roleId: integer("role_id").notNull(),
-  workspaceId: integer("workspace_id").notNull(),
-  month: text("month").notNull(), // YYYY-MM format
-  headcount: integer("headcount").notNull(),
-  createdAt: timestamp("created_at").defaultNow(),
-});
-
-export const insertPersonnelProjectionSchema = createInsertSchema(personnelProjections).omit({
-  id: true,
-  createdAt: true,
-});
-
-// Custom formulas
-export const formulas = pgTable("formulas", {
-  id: serial("id").primaryKey(),
-  workspaceId: integer("workspace_id").notNull(),
+  forecastId: integer("forecast_id").notNull(),
   name: text("name").notNull(),
-  description: text("description"),
   formula: text("formula").notNull(),
-  variables: jsonb("variables").notNull(),
-  createdAt: timestamp("created_at").defaultNow(),
-});
-
-export const insertFormulaSchema = createInsertSchema(formulas).omit({
-  id: true,
-  createdAt: true,
-});
-
-// Scenarios
-export const scenarios = pgTable("scenarios", {
-  id: serial("id").primaryKey(),
-  workspaceId: integer("workspace_id").notNull(),
-  name: text("name").notNull(),
   description: text("description"),
-  isActive: boolean("is_active").default(false),
-  assumptions: jsonb("assumptions"), // Store scenario assumptions
-  createdAt: timestamp("created_at").defaultNow(),
+  category: text("category"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
-export const insertScenarioSchema = createInsertSchema(scenarios).omit({
+export const insertCustomFormulaSchema = createInsertSchema(customFormulas).omit({
   id: true,
   createdAt: true,
+  updatedAt: true,
 });
 
-// QuickBooks integration
-export const quickbooksIntegration = pgTable("quickbooks_integration", {
+// QuickBooks Integration schema
+export const quickbooksIntegrations = pgTable("quickbooks_integrations", {
   id: serial("id").primaryKey(),
-  workspaceId: integer("workspace_id").notNull().unique(),
-  isConnected: boolean("is_connected").default(false),
+  userId: integer("user_id").notNull().unique(),
   accessToken: text("access_token"),
   refreshToken: text("refresh_token"),
   realmId: text("realm_id"),
-  lastSynced: timestamp("last_synced"),
-  createdAt: timestamp("created_at").defaultNow(),
+  expiresAt: timestamp("expires_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
-export const insertQuickbooksIntegrationSchema = createInsertSchema(quickbooksIntegration).omit({
+export const insertQuickbooksIntegrationSchema = createInsertSchema(quickbooksIntegrations).omit({
   id: true,
   createdAt: true,
+  updatedAt: true,
 });
 
-// Transactions from QuickBooks
-export const transactions = pgTable("transactions", {
+// Financial Projections schema
+export const financialProjections = pgTable("financial_projections", {
   id: serial("id").primaryKey(),
-  workspaceId: integer("workspace_id").notNull(),
-  externalId: text("external_id"), // ID from QuickBooks
-  date: timestamp("date").notNull(),
-  description: text("description"),
-  amount: numeric("amount").notNull(),
-  category: text("category"),
-  type: text("type").notNull(), // income or expense
-  createdAt: timestamp("created_at").defaultNow(),
+  forecastId: integer("forecast_id").notNull(),
+  period: text("period").notNull(), // month-year like "01-2023"
+  revenueTotal: numeric("revenue_total", { precision: 15, scale: 2 }),
+  cogsTotal: numeric("cogs_total", { precision: 15, scale: 2 }),
+  expenseTotal: numeric("expense_total", { precision: 15, scale: 2 }),
+  personnelTotal: numeric("personnel_total", { precision: 15, scale: 2 }),
+  netProfit: numeric("net_profit", { precision: 15, scale: 2 }),
+  cashInflow: numeric("cash_inflow", { precision: 15, scale: 2 }),
+  cashOutflow: numeric("cash_outflow", { precision: 15, scale: 2 }),
+  cashBalance: numeric("cash_balance", { precision: 15, scale: 2 }),
+  projectionData: jsonb("projection_data"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
-export const insertTransactionSchema = createInsertSchema(transactions).omit({
+export const insertFinancialProjectionSchema = createInsertSchema(financialProjections).omit({
   id: true,
   createdAt: true,
+  updatedAt: true,
 });
 
 // Export types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
 
-export type Workspace = typeof workspaces.$inferSelect;
-export type InsertWorkspace = z.infer<typeof insertWorkspaceSchema>;
+export type Forecast = typeof forecasts.$inferSelect;
+export type InsertForecast = z.infer<typeof insertForecastSchema>;
+
+export type RevenueDriver = typeof revenueDrivers.$inferSelect;
+export type InsertRevenueDriver = z.infer<typeof insertRevenueDriverSchema>;
 
 export type RevenueStream = typeof revenueStreams.$inferSelect;
 export type InsertRevenueStream = z.infer<typeof insertRevenueStreamSchema>;
 
-export type RevenueProjection = typeof revenueProjections.$inferSelect;
-export type InsertRevenueProjection = z.infer<typeof insertRevenueProjectionSchema>;
+export type Expense = typeof expenses.$inferSelect;
+export type InsertExpense = z.infer<typeof insertExpenseSchema>;
 
-export type ExpenseCategory = typeof expenseCategories.$inferSelect;
-export type InsertExpenseCategory = z.infer<typeof insertExpenseCategorySchema>;
-
-export type ExpenseProjection = typeof expenseProjections.$inferSelect;
-export type InsertExpenseProjection = z.infer<typeof insertExpenseProjectionSchema>;
+export type Department = typeof departments.$inferSelect;
+export type InsertDepartment = z.infer<typeof insertDepartmentSchema>;
 
 export type PersonnelRole = typeof personnelRoles.$inferSelect;
 export type InsertPersonnelRole = z.infer<typeof insertPersonnelRoleSchema>;
 
-export type PersonnelProjection = typeof personnelProjections.$inferSelect;
-export type InsertPersonnelProjection = z.infer<typeof insertPersonnelProjectionSchema>;
+export type CustomFormula = typeof customFormulas.$inferSelect;
+export type InsertCustomFormula = z.infer<typeof insertCustomFormulaSchema>;
 
-export type Formula = typeof formulas.$inferSelect;
-export type InsertFormula = z.infer<typeof insertFormulaSchema>;
-
-export type Scenario = typeof scenarios.$inferSelect;
-export type InsertScenario = z.infer<typeof insertScenarioSchema>;
-
-export type QuickbooksIntegration = typeof quickbooksIntegration.$inferSelect;
+export type QuickbooksIntegration = typeof quickbooksIntegrations.$inferSelect;
 export type InsertQuickbooksIntegration = z.infer<typeof insertQuickbooksIntegrationSchema>;
 
-export type Transaction = typeof transactions.$inferSelect;
-export type InsertTransaction = z.infer<typeof insertTransactionSchema>;
+export type FinancialProjection = typeof financialProjections.$inferSelect;
+export type InsertFinancialProjection = z.infer<typeof insertFinancialProjectionSchema>;

@@ -1,749 +1,714 @@
 import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import {
-  insertUserSchema,
-  insertWorkspaceSchema,
+import { 
+  insertUserSchema, 
+  insertForecastSchema, 
+  insertRevenueDriverSchema, 
   insertRevenueStreamSchema,
-  insertRevenueProjectionSchema,
-  insertExpenseCategorySchema,
-  insertExpenseProjectionSchema,
+  insertExpenseSchema,
+  insertDepartmentSchema,
   insertPersonnelRoleSchema,
-  insertPersonnelProjectionSchema,
-  insertFormulaSchema,
-  insertScenarioSchema,
+  insertCustomFormulaSchema,
   insertQuickbooksIntegrationSchema,
-  insertTransactionSchema,
+  insertFinancialProjectionSchema
 } from "@shared/schema";
 import { ZodError } from "zod";
+import { fromZodError } from "zod-validation-error";
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Authentication middleware
-  const authenticateUser = async (req: Request, res: Response, next: Function) => {
-    // In a real app, this would validate a session/token
-    // For the MVP, we'll just use a simple authentication
-    const userId = req.headers['x-user-id'];
-    
-    if (!userId) {
-      return res.status(401).json({ message: 'Authentication required' });
-    }
-    
-    try {
-      const user = await storage.getUser(Number(userId));
-      if (!user) {
-        return res.status(401).json({ message: 'Invalid user' });
-      }
-      
-      // Add user to request object
-      (req as any).user = user;
-      next();
-    } catch (error) {
-      return res.status(500).json({ message: 'Server error during authentication' });
-    }
-  };
-
-  // Error handler for Zod validation errors
-  const handleZodError = (error: unknown, res: Response) => {
-    if (error instanceof ZodError) {
-      return res.status(400).json({
-        message: 'Validation error',
-        errors: error.errors
+  // Error handler for validation errors
+  const handleValidationError = (err: unknown, res: Response) => {
+    if (err instanceof ZodError) {
+      const validationError = fromZodError(err);
+      return res.status(400).json({ 
+        message: validationError.message,
+        errors: err.errors
       });
     }
-    console.error('Unexpected error:', error);
-    return res.status(500).json({
-      message: 'Internal server error'
-    });
+    
+    console.error('Error:', err);
+    return res.status(500).json({ message: 'Internal server error' });
   };
 
   // User routes
-  app.post('/api/users', async (req, res) => {
+  app.post('/api/users', async (req: Request, res: Response) => {
     try {
       const userData = insertUserSchema.parse(req.body);
       
-      // Check if user already exists
-      const existingByUsername = await storage.getUserByUsername(userData.username);
-      if (existingByUsername) {
-        return res.status(400).json({ message: 'Username already exists' });
+      // Check if username exists
+      const existingUserByUsername = await storage.getUserByUsername(userData.username);
+      if (existingUserByUsername) {
+        return res.status(400).json({ message: 'Username already taken' });
       }
       
-      const existingByEmail = await storage.getUserByEmail(userData.email);
-      if (existingByEmail) {
-        return res.status(400).json({ message: 'Email already exists' });
+      // Check if email exists
+      const existingUserByEmail = await storage.getUserByEmail(userData.email);
+      if (existingUserByEmail) {
+        return res.status(400).json({ message: 'Email already registered' });
       }
       
       const user = await storage.createUser(userData);
-      res.status(201).json(user);
-    } catch (error) {
-      handleZodError(error, res);
+      return res.status(201).json(user);
+    } catch (err) {
+      return handleValidationError(err, res);
     }
   });
-
-  app.post('/api/auth/login', async (req, res) => {
+  
+  app.get('/api/users/:id', async (req: Request, res: Response) => {
+    const userId = parseInt(req.params.id);
+    if (isNaN(userId)) {
+      return res.status(400).json({ message: 'Invalid user ID' });
+    }
+    
+    const user = await storage.getUser(userId);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    
+    // Don't send the password in the response
+    const { password, ...userData } = user;
+    return res.json(userData);
+  });
+  
+  // Forecast routes
+  app.get('/api/forecasts', async (req: Request, res: Response) => {
+    const userId = Number(req.query.userId);
+    if (isNaN(userId)) {
+      return res.status(400).json({ message: 'Invalid user ID' });
+    }
+    
+    const forecasts = await storage.getForecastsByUserId(userId);
+    return res.json(forecasts);
+  });
+  
+  app.get('/api/forecasts/:id', async (req: Request, res: Response) => {
+    const forecastId = parseInt(req.params.id);
+    if (isNaN(forecastId)) {
+      return res.status(400).json({ message: 'Invalid forecast ID' });
+    }
+    
+    const forecast = await storage.getForecast(forecastId);
+    if (!forecast) {
+      return res.status(404).json({ message: 'Forecast not found' });
+    }
+    
+    return res.json(forecast);
+  });
+  
+  app.post('/api/forecasts', async (req: Request, res: Response) => {
     try {
-      const { username, password } = req.body;
-      
-      if (!username || !password) {
-        return res.status(400).json({ message: 'Username and password are required' });
+      const forecastData = insertForecastSchema.parse(req.body);
+      const forecast = await storage.createForecast(forecastData);
+      return res.status(201).json(forecast);
+    } catch (err) {
+      return handleValidationError(err, res);
+    }
+  });
+  
+  app.put('/api/forecasts/:id', async (req: Request, res: Response) => {
+    try {
+      const forecastId = parseInt(req.params.id);
+      if (isNaN(forecastId)) {
+        return res.status(400).json({ message: 'Invalid forecast ID' });
       }
       
-      const user = await storage.getUserByUsername(username);
+      const forecastData = insertForecastSchema.partial().parse(req.body);
+      const updatedForecast = await storage.updateForecast(forecastId, forecastData);
       
-      if (!user || user.password !== password) {
-        return res.status(401).json({ message: 'Invalid credentials' });
+      if (!updatedForecast) {
+        return res.status(404).json({ message: 'Forecast not found' });
       }
       
-      // In a real app, we'd create a proper session
-      res.status(200).json({
-        id: user.id,
-        username: user.username,
-        email: user.email,
-        fullName: user.fullName,
-        companyName: user.companyName
-      });
-    } catch (error) {
-      console.error('Login error:', error);
-      res.status(500).json({ message: 'Server error during login' });
+      return res.json(updatedForecast);
+    } catch (err) {
+      return handleValidationError(err, res);
     }
   });
-
-  // Workspace routes
-  app.get('/api/workspaces', authenticateUser, async (req, res) => {
+  
+  app.delete('/api/forecasts/:id', async (req: Request, res: Response) => {
+    const forecastId = parseInt(req.params.id);
+    if (isNaN(forecastId)) {
+      return res.status(400).json({ message: 'Invalid forecast ID' });
+    }
+    
+    const success = await storage.deleteForecast(forecastId);
+    if (!success) {
+      return res.status(404).json({ message: 'Forecast not found' });
+    }
+    
+    return res.status(204).end();
+  });
+  
+  // Revenue Driver routes
+  app.get('/api/revenue-drivers', async (req: Request, res: Response) => {
+    const forecastId = Number(req.query.forecastId);
+    if (isNaN(forecastId)) {
+      return res.status(400).json({ message: 'Invalid forecast ID' });
+    }
+    
+    const drivers = await storage.getRevenueDriversByForecastId(forecastId);
+    return res.json(drivers);
+  });
+  
+  app.get('/api/revenue-drivers/:id', async (req: Request, res: Response) => {
+    const driverId = parseInt(req.params.id);
+    if (isNaN(driverId)) {
+      return res.status(400).json({ message: 'Invalid driver ID' });
+    }
+    
+    const driver = await storage.getRevenueDriver(driverId);
+    if (!driver) {
+      return res.status(404).json({ message: 'Revenue driver not found' });
+    }
+    
+    return res.json(driver);
+  });
+  
+  app.post('/api/revenue-drivers', async (req: Request, res: Response) => {
     try {
-      const user = (req as any).user;
-      const workspaces = await storage.getWorkspacesByOwnerId(user.id);
-      res.status(200).json(workspaces);
-    } catch (error) {
-      console.error('Error fetching workspaces:', error);
-      res.status(500).json({ message: 'Server error' });
+      const driverData = insertRevenueDriverSchema.parse(req.body);
+      const driver = await storage.createRevenueDriver(driverData);
+      return res.status(201).json(driver);
+    } catch (err) {
+      return handleValidationError(err, res);
     }
   });
-
-  app.post('/api/workspaces', authenticateUser, async (req, res) => {
+  
+  app.put('/api/revenue-drivers/:id', async (req: Request, res: Response) => {
     try {
-      const user = (req as any).user;
-      const workspaceData = insertWorkspaceSchema.parse({
-        ...req.body,
-        ownerId: user.id
-      });
-      
-      const workspace = await storage.createWorkspace(workspaceData);
-      res.status(201).json(workspace);
-    } catch (error) {
-      handleZodError(error, res);
-    }
-  });
-
-  app.get('/api/workspaces/:id', authenticateUser, async (req, res) => {
-    try {
-      const workspaceId = parseInt(req.params.id);
-      const workspace = await storage.getWorkspace(workspaceId);
-      
-      if (!workspace) {
-        return res.status(404).json({ message: 'Workspace not found' });
+      const driverId = parseInt(req.params.id);
+      if (isNaN(driverId)) {
+        return res.status(400).json({ message: 'Invalid driver ID' });
       }
       
-      // Verify ownership
-      const user = (req as any).user;
-      if (workspace.ownerId !== user.id) {
-        return res.status(403).json({ message: 'Not authorized to access this workspace' });
+      const driverData = insertRevenueDriverSchema.partial().parse(req.body);
+      const updatedDriver = await storage.updateRevenueDriver(driverId, driverData);
+      
+      if (!updatedDriver) {
+        return res.status(404).json({ message: 'Revenue driver not found' });
       }
       
-      res.status(200).json(workspace);
-    } catch (error) {
-      console.error('Error fetching workspace:', error);
-      res.status(500).json({ message: 'Server error' });
+      return res.json(updatedDriver);
+    } catch (err) {
+      return handleValidationError(err, res);
     }
   });
-
+  
+  app.delete('/api/revenue-drivers/:id', async (req: Request, res: Response) => {
+    const driverId = parseInt(req.params.id);
+    if (isNaN(driverId)) {
+      return res.status(400).json({ message: 'Invalid driver ID' });
+    }
+    
+    const success = await storage.deleteRevenueDriver(driverId);
+    if (!success) {
+      return res.status(404).json({ message: 'Revenue driver not found' });
+    }
+    
+    return res.status(204).end();
+  });
+  
   // Revenue Stream routes
-  app.get('/api/workspaces/:workspaceId/revenue-streams', authenticateUser, async (req, res) => {
-    try {
-      const workspaceId = parseInt(req.params.workspaceId);
-      const workspace = await storage.getWorkspace(workspaceId);
-      
-      if (!workspace) {
-        return res.status(404).json({ message: 'Workspace not found' });
-      }
-      
-      // Verify ownership
-      const user = (req as any).user;
-      if (workspace.ownerId !== user.id) {
-        return res.status(403).json({ message: 'Not authorized to access this workspace' });
-      }
-      
-      const streams = await storage.getRevenueStreamsByWorkspaceId(workspaceId);
-      res.status(200).json(streams);
-    } catch (error) {
-      console.error('Error fetching revenue streams:', error);
-      res.status(500).json({ message: 'Server error' });
+  app.get('/api/revenue-streams', async (req: Request, res: Response) => {
+    const forecastId = Number(req.query.forecastId);
+    if (isNaN(forecastId)) {
+      return res.status(400).json({ message: 'Invalid forecast ID' });
     }
+    
+    const streams = await storage.getRevenueStreamsByForecastId(forecastId);
+    return res.json(streams);
   });
-
-  app.post('/api/workspaces/:workspaceId/revenue-streams', authenticateUser, async (req, res) => {
+  
+  app.get('/api/revenue-streams/:id', async (req: Request, res: Response) => {
+    const streamId = parseInt(req.params.id);
+    if (isNaN(streamId)) {
+      return res.status(400).json({ message: 'Invalid stream ID' });
+    }
+    
+    const stream = await storage.getRevenueStream(streamId);
+    if (!stream) {
+      return res.status(404).json({ message: 'Revenue stream not found' });
+    }
+    
+    return res.json(stream);
+  });
+  
+  app.post('/api/revenue-streams', async (req: Request, res: Response) => {
     try {
-      const workspaceId = parseInt(req.params.workspaceId);
-      const workspace = await storage.getWorkspace(workspaceId);
-      
-      if (!workspace) {
-        return res.status(404).json({ message: 'Workspace not found' });
-      }
-      
-      // Verify ownership
-      const user = (req as any).user;
-      if (workspace.ownerId !== user.id) {
-        return res.status(403).json({ message: 'Not authorized to access this workspace' });
-      }
-      
-      const streamData = insertRevenueStreamSchema.parse({
-        ...req.body,
-        workspaceId
-      });
-      
+      const streamData = insertRevenueStreamSchema.parse(req.body);
       const stream = await storage.createRevenueStream(streamData);
-      res.status(201).json(stream);
-    } catch (error) {
-      handleZodError(error, res);
+      return res.status(201).json(stream);
+    } catch (err) {
+      return handleValidationError(err, res);
     }
   });
-
-  // Revenue Projection routes
-  app.get('/api/workspaces/:workspaceId/revenue-projections', authenticateUser, async (req, res) => {
+  
+  app.put('/api/revenue-streams/:id', async (req: Request, res: Response) => {
     try {
-      const workspaceId = parseInt(req.params.workspaceId);
-      const month = req.query.month as string | undefined;
-      
-      const workspace = await storage.getWorkspace(workspaceId);
-      
-      if (!workspace) {
-        return res.status(404).json({ message: 'Workspace not found' });
+      const streamId = parseInt(req.params.id);
+      if (isNaN(streamId)) {
+        return res.status(400).json({ message: 'Invalid stream ID' });
       }
       
-      // Verify ownership
-      const user = (req as any).user;
-      if (workspace.ownerId !== user.id) {
-        return res.status(403).json({ message: 'Not authorized to access this workspace' });
+      const streamData = insertRevenueStreamSchema.partial().parse(req.body);
+      const updatedStream = await storage.updateRevenueStream(streamId, streamData);
+      
+      if (!updatedStream) {
+        return res.status(404).json({ message: 'Revenue stream not found' });
       }
       
-      const projections = await storage.getRevenueProjectionsByWorkspaceId(workspaceId, month);
-      res.status(200).json(projections);
-    } catch (error) {
-      console.error('Error fetching revenue projections:', error);
-      res.status(500).json({ message: 'Server error' });
+      return res.json(updatedStream);
+    } catch (err) {
+      return handleValidationError(err, res);
     }
   });
-
-  app.post('/api/workspaces/:workspaceId/revenue-projections', authenticateUser, async (req, res) => {
+  
+  app.delete('/api/revenue-streams/:id', async (req: Request, res: Response) => {
+    const streamId = parseInt(req.params.id);
+    if (isNaN(streamId)) {
+      return res.status(400).json({ message: 'Invalid stream ID' });
+    }
+    
+    const success = await storage.deleteRevenueStream(streamId);
+    if (!success) {
+      return res.status(404).json({ message: 'Revenue stream not found' });
+    }
+    
+    return res.status(204).end();
+  });
+  
+  // Expense routes
+  app.get('/api/expenses', async (req: Request, res: Response) => {
+    const forecastId = Number(req.query.forecastId);
+    if (isNaN(forecastId)) {
+      return res.status(400).json({ message: 'Invalid forecast ID' });
+    }
+    
+    const expenses = await storage.getExpensesByForecastId(forecastId);
+    return res.json(expenses);
+  });
+  
+  app.get('/api/expenses/:id', async (req: Request, res: Response) => {
+    const expenseId = parseInt(req.params.id);
+    if (isNaN(expenseId)) {
+      return res.status(400).json({ message: 'Invalid expense ID' });
+    }
+    
+    const expense = await storage.getExpense(expenseId);
+    if (!expense) {
+      return res.status(404).json({ message: 'Expense not found' });
+    }
+    
+    return res.json(expense);
+  });
+  
+  app.post('/api/expenses', async (req: Request, res: Response) => {
     try {
-      const workspaceId = parseInt(req.params.workspaceId);
-      const workspace = await storage.getWorkspace(workspaceId);
-      
-      if (!workspace) {
-        return res.status(404).json({ message: 'Workspace not found' });
-      }
-      
-      // Verify ownership
-      const user = (req as any).user;
-      if (workspace.ownerId !== user.id) {
-        return res.status(403).json({ message: 'Not authorized to access this workspace' });
-      }
-      
-      const projectionData = insertRevenueProjectionSchema.parse({
-        ...req.body,
-        workspaceId
-      });
-      
-      const projection = await storage.createRevenueProjection(projectionData);
-      res.status(201).json(projection);
-    } catch (error) {
-      handleZodError(error, res);
+      const expenseData = insertExpenseSchema.parse(req.body);
+      const expense = await storage.createExpense(expenseData);
+      return res.status(201).json(expense);
+    } catch (err) {
+      return handleValidationError(err, res);
     }
   });
-
-  // Expense Category routes
-  app.get('/api/workspaces/:workspaceId/expense-categories', authenticateUser, async (req, res) => {
+  
+  app.put('/api/expenses/:id', async (req: Request, res: Response) => {
     try {
-      const workspaceId = parseInt(req.params.workspaceId);
-      const workspace = await storage.getWorkspace(workspaceId);
-      
-      if (!workspace) {
-        return res.status(404).json({ message: 'Workspace not found' });
+      const expenseId = parseInt(req.params.id);
+      if (isNaN(expenseId)) {
+        return res.status(400).json({ message: 'Invalid expense ID' });
       }
       
-      // Verify ownership
-      const user = (req as any).user;
-      if (workspace.ownerId !== user.id) {
-        return res.status(403).json({ message: 'Not authorized to access this workspace' });
+      const expenseData = insertExpenseSchema.partial().parse(req.body);
+      const updatedExpense = await storage.updateExpense(expenseId, expenseData);
+      
+      if (!updatedExpense) {
+        return res.status(404).json({ message: 'Expense not found' });
       }
       
-      const categories = await storage.getExpenseCategoriesByWorkspaceId(workspaceId);
-      res.status(200).json(categories);
-    } catch (error) {
-      console.error('Error fetching expense categories:', error);
-      res.status(500).json({ message: 'Server error' });
+      return res.json(updatedExpense);
+    } catch (err) {
+      return handleValidationError(err, res);
     }
   });
-
-  app.post('/api/workspaces/:workspaceId/expense-categories', authenticateUser, async (req, res) => {
+  
+  app.delete('/api/expenses/:id', async (req: Request, res: Response) => {
+    const expenseId = parseInt(req.params.id);
+    if (isNaN(expenseId)) {
+      return res.status(400).json({ message: 'Invalid expense ID' });
+    }
+    
+    const success = await storage.deleteExpense(expenseId);
+    if (!success) {
+      return res.status(404).json({ message: 'Expense not found' });
+    }
+    
+    return res.status(204).end();
+  });
+  
+  // Department routes
+  app.get('/api/departments', async (req: Request, res: Response) => {
+    const forecastId = Number(req.query.forecastId);
+    if (isNaN(forecastId)) {
+      return res.status(400).json({ message: 'Invalid forecast ID' });
+    }
+    
+    const departments = await storage.getDepartmentsByForecastId(forecastId);
+    return res.json(departments);
+  });
+  
+  app.get('/api/departments/:id', async (req: Request, res: Response) => {
+    const departmentId = parseInt(req.params.id);
+    if (isNaN(departmentId)) {
+      return res.status(400).json({ message: 'Invalid department ID' });
+    }
+    
+    const department = await storage.getDepartment(departmentId);
+    if (!department) {
+      return res.status(404).json({ message: 'Department not found' });
+    }
+    
+    return res.json(department);
+  });
+  
+  app.post('/api/departments', async (req: Request, res: Response) => {
     try {
-      const workspaceId = parseInt(req.params.workspaceId);
-      const workspace = await storage.getWorkspace(workspaceId);
-      
-      if (!workspace) {
-        return res.status(404).json({ message: 'Workspace not found' });
-      }
-      
-      // Verify ownership
-      const user = (req as any).user;
-      if (workspace.ownerId !== user.id) {
-        return res.status(403).json({ message: 'Not authorized to access this workspace' });
-      }
-      
-      const categoryData = insertExpenseCategorySchema.parse({
-        ...req.body,
-        workspaceId
-      });
-      
-      const category = await storage.createExpenseCategory(categoryData);
-      res.status(201).json(category);
-    } catch (error) {
-      handleZodError(error, res);
+      const departmentData = insertDepartmentSchema.parse(req.body);
+      const department = await storage.createDepartment(departmentData);
+      return res.status(201).json(department);
+    } catch (err) {
+      return handleValidationError(err, res);
     }
   });
-
-  // Expense Projection routes
-  app.get('/api/workspaces/:workspaceId/expense-projections', authenticateUser, async (req, res) => {
+  
+  app.put('/api/departments/:id', async (req: Request, res: Response) => {
     try {
-      const workspaceId = parseInt(req.params.workspaceId);
-      const month = req.query.month as string | undefined;
-      
-      const workspace = await storage.getWorkspace(workspaceId);
-      
-      if (!workspace) {
-        return res.status(404).json({ message: 'Workspace not found' });
+      const departmentId = parseInt(req.params.id);
+      if (isNaN(departmentId)) {
+        return res.status(400).json({ message: 'Invalid department ID' });
       }
       
-      // Verify ownership
-      const user = (req as any).user;
-      if (workspace.ownerId !== user.id) {
-        return res.status(403).json({ message: 'Not authorized to access this workspace' });
+      const departmentData = insertDepartmentSchema.partial().parse(req.body);
+      const updatedDepartment = await storage.updateDepartment(departmentId, departmentData);
+      
+      if (!updatedDepartment) {
+        return res.status(404).json({ message: 'Department not found' });
       }
       
-      const projections = await storage.getExpenseProjectionsByWorkspaceId(workspaceId, month);
-      res.status(200).json(projections);
-    } catch (error) {
-      console.error('Error fetching expense projections:', error);
-      res.status(500).json({ message: 'Server error' });
+      return res.json(updatedDepartment);
+    } catch (err) {
+      return handleValidationError(err, res);
     }
   });
-
-  app.post('/api/workspaces/:workspaceId/expense-projections', authenticateUser, async (req, res) => {
-    try {
-      const workspaceId = parseInt(req.params.workspaceId);
-      const workspace = await storage.getWorkspace(workspaceId);
-      
-      if (!workspace) {
-        return res.status(404).json({ message: 'Workspace not found' });
-      }
-      
-      // Verify ownership
-      const user = (req as any).user;
-      if (workspace.ownerId !== user.id) {
-        return res.status(403).json({ message: 'Not authorized to access this workspace' });
-      }
-      
-      const projectionData = insertExpenseProjectionSchema.parse({
-        ...req.body,
-        workspaceId
-      });
-      
-      const projection = await storage.createExpenseProjection(projectionData);
-      res.status(201).json(projection);
-    } catch (error) {
-      handleZodError(error, res);
+  
+  app.delete('/api/departments/:id', async (req: Request, res: Response) => {
+    const departmentId = parseInt(req.params.id);
+    if (isNaN(departmentId)) {
+      return res.status(400).json({ message: 'Invalid department ID' });
     }
+    
+    const success = await storage.deleteDepartment(departmentId);
+    if (!success) {
+      return res.status(404).json({ message: 'Department not found' });
+    }
+    
+    return res.status(204).end();
   });
-
+  
   // Personnel Role routes
-  app.get('/api/workspaces/:workspaceId/personnel-roles', authenticateUser, async (req, res) => {
-    try {
-      const workspaceId = parseInt(req.params.workspaceId);
-      const workspace = await storage.getWorkspace(workspaceId);
-      
-      if (!workspace) {
-        return res.status(404).json({ message: 'Workspace not found' });
-      }
-      
-      // Verify ownership
-      const user = (req as any).user;
-      if (workspace.ownerId !== user.id) {
-        return res.status(403).json({ message: 'Not authorized to access this workspace' });
-      }
-      
-      const roles = await storage.getPersonnelRolesByWorkspaceId(workspaceId);
-      res.status(200).json(roles);
-    } catch (error) {
-      console.error('Error fetching personnel roles:', error);
-      res.status(500).json({ message: 'Server error' });
+  app.get('/api/personnel-roles', async (req: Request, res: Response) => {
+    const forecastId = Number(req.query.forecastId);
+    const departmentId = Number(req.query.departmentId);
+    
+    if (forecastId && !isNaN(forecastId)) {
+      const roles = await storage.getPersonnelRolesByForecastId(forecastId);
+      return res.json(roles);
+    } else if (departmentId && !isNaN(departmentId)) {
+      const roles = await storage.getPersonnelRolesByDepartmentId(departmentId);
+      return res.json(roles);
+    } else {
+      return res.status(400).json({ message: 'Invalid or missing forecast ID or department ID' });
     }
   });
-
-  app.post('/api/workspaces/:workspaceId/personnel-roles', authenticateUser, async (req, res) => {
+  
+  app.get('/api/personnel-roles/:id', async (req: Request, res: Response) => {
+    const roleId = parseInt(req.params.id);
+    if (isNaN(roleId)) {
+      return res.status(400).json({ message: 'Invalid role ID' });
+    }
+    
+    const role = await storage.getPersonnelRole(roleId);
+    if (!role) {
+      return res.status(404).json({ message: 'Personnel role not found' });
+    }
+    
+    return res.json(role);
+  });
+  
+  app.post('/api/personnel-roles', async (req: Request, res: Response) => {
     try {
-      const workspaceId = parseInt(req.params.workspaceId);
-      const workspace = await storage.getWorkspace(workspaceId);
-      
-      if (!workspace) {
-        return res.status(404).json({ message: 'Workspace not found' });
-      }
-      
-      // Verify ownership
-      const user = (req as any).user;
-      if (workspace.ownerId !== user.id) {
-        return res.status(403).json({ message: 'Not authorized to access this workspace' });
-      }
-      
-      const roleData = insertPersonnelRoleSchema.parse({
-        ...req.body,
-        workspaceId
-      });
-      
+      const roleData = insertPersonnelRoleSchema.parse(req.body);
       const role = await storage.createPersonnelRole(roleData);
-      res.status(201).json(role);
-    } catch (error) {
-      handleZodError(error, res);
+      return res.status(201).json(role);
+    } catch (err) {
+      return handleValidationError(err, res);
     }
   });
-
-  // Personnel Projection routes
-  app.get('/api/workspaces/:workspaceId/personnel-projections', authenticateUser, async (req, res) => {
+  
+  app.put('/api/personnel-roles/:id', async (req: Request, res: Response) => {
     try {
-      const workspaceId = parseInt(req.params.workspaceId);
-      const month = req.query.month as string | undefined;
-      
-      const workspace = await storage.getWorkspace(workspaceId);
-      
-      if (!workspace) {
-        return res.status(404).json({ message: 'Workspace not found' });
+      const roleId = parseInt(req.params.id);
+      if (isNaN(roleId)) {
+        return res.status(400).json({ message: 'Invalid role ID' });
       }
       
-      // Verify ownership
-      const user = (req as any).user;
-      if (workspace.ownerId !== user.id) {
-        return res.status(403).json({ message: 'Not authorized to access this workspace' });
+      const roleData = insertPersonnelRoleSchema.partial().parse(req.body);
+      const updatedRole = await storage.updatePersonnelRole(roleId, roleData);
+      
+      if (!updatedRole) {
+        return res.status(404).json({ message: 'Personnel role not found' });
       }
       
-      const projections = await storage.getPersonnelProjectionsByWorkspaceId(workspaceId, month);
-      res.status(200).json(projections);
-    } catch (error) {
-      console.error('Error fetching personnel projections:', error);
-      res.status(500).json({ message: 'Server error' });
+      return res.json(updatedRole);
+    } catch (err) {
+      return handleValidationError(err, res);
     }
   });
-
-  app.post('/api/workspaces/:workspaceId/personnel-projections', authenticateUser, async (req, res) => {
+  
+  app.delete('/api/personnel-roles/:id', async (req: Request, res: Response) => {
+    const roleId = parseInt(req.params.id);
+    if (isNaN(roleId)) {
+      return res.status(400).json({ message: 'Invalid role ID' });
+    }
+    
+    const success = await storage.deletePersonnelRole(roleId);
+    if (!success) {
+      return res.status(404).json({ message: 'Personnel role not found' });
+    }
+    
+    return res.status(204).end();
+  });
+  
+  // Custom Formula routes
+  app.get('/api/custom-formulas', async (req: Request, res: Response) => {
+    const forecastId = Number(req.query.forecastId);
+    if (isNaN(forecastId)) {
+      return res.status(400).json({ message: 'Invalid forecast ID' });
+    }
+    
+    const formulas = await storage.getCustomFormulasByForecastId(forecastId);
+    return res.json(formulas);
+  });
+  
+  app.get('/api/custom-formulas/:id', async (req: Request, res: Response) => {
+    const formulaId = parseInt(req.params.id);
+    if (isNaN(formulaId)) {
+      return res.status(400).json({ message: 'Invalid formula ID' });
+    }
+    
+    const formula = await storage.getCustomFormula(formulaId);
+    if (!formula) {
+      return res.status(404).json({ message: 'Custom formula not found' });
+    }
+    
+    return res.json(formula);
+  });
+  
+  app.post('/api/custom-formulas', async (req: Request, res: Response) => {
     try {
-      const workspaceId = parseInt(req.params.workspaceId);
-      const workspace = await storage.getWorkspace(workspaceId);
-      
-      if (!workspace) {
-        return res.status(404).json({ message: 'Workspace not found' });
-      }
-      
-      // Verify ownership
-      const user = (req as any).user;
-      if (workspace.ownerId !== user.id) {
-        return res.status(403).json({ message: 'Not authorized to access this workspace' });
-      }
-      
-      const projectionData = insertPersonnelProjectionSchema.parse({
-        ...req.body,
-        workspaceId
-      });
-      
-      const projection = await storage.createPersonnelProjection(projectionData);
-      res.status(201).json(projection);
-    } catch (error) {
-      handleZodError(error, res);
+      const formulaData = insertCustomFormulaSchema.parse(req.body);
+      const formula = await storage.createCustomFormula(formulaData);
+      return res.status(201).json(formula);
+    } catch (err) {
+      return handleValidationError(err, res);
     }
   });
-
-  // Formula routes
-  app.get('/api/workspaces/:workspaceId/formulas', authenticateUser, async (req, res) => {
+  
+  app.put('/api/custom-formulas/:id', async (req: Request, res: Response) => {
     try {
-      const workspaceId = parseInt(req.params.workspaceId);
-      const workspace = await storage.getWorkspace(workspaceId);
-      
-      if (!workspace) {
-        return res.status(404).json({ message: 'Workspace not found' });
+      const formulaId = parseInt(req.params.id);
+      if (isNaN(formulaId)) {
+        return res.status(400).json({ message: 'Invalid formula ID' });
       }
       
-      // Verify ownership
-      const user = (req as any).user;
-      if (workspace.ownerId !== user.id) {
-        return res.status(403).json({ message: 'Not authorized to access this workspace' });
+      const formulaData = insertCustomFormulaSchema.partial().parse(req.body);
+      const updatedFormula = await storage.updateCustomFormula(formulaId, formulaData);
+      
+      if (!updatedFormula) {
+        return res.status(404).json({ message: 'Custom formula not found' });
       }
       
-      const formulas = await storage.getFormulasByWorkspaceId(workspaceId);
-      res.status(200).json(formulas);
-    } catch (error) {
-      console.error('Error fetching formulas:', error);
-      res.status(500).json({ message: 'Server error' });
+      return res.json(updatedFormula);
+    } catch (err) {
+      return handleValidationError(err, res);
     }
   });
-
-  app.post('/api/workspaces/:workspaceId/formulas', authenticateUser, async (req, res) => {
-    try {
-      const workspaceId = parseInt(req.params.workspaceId);
-      const workspace = await storage.getWorkspace(workspaceId);
-      
-      if (!workspace) {
-        return res.status(404).json({ message: 'Workspace not found' });
-      }
-      
-      // Verify ownership
-      const user = (req as any).user;
-      if (workspace.ownerId !== user.id) {
-        return res.status(403).json({ message: 'Not authorized to access this workspace' });
-      }
-      
-      const formulaData = insertFormulaSchema.parse({
-        ...req.body,
-        workspaceId
-      });
-      
-      const formula = await storage.createFormula(formulaData);
-      res.status(201).json(formula);
-    } catch (error) {
-      handleZodError(error, res);
+  
+  app.delete('/api/custom-formulas/:id', async (req: Request, res: Response) => {
+    const formulaId = parseInt(req.params.id);
+    if (isNaN(formulaId)) {
+      return res.status(400).json({ message: 'Invalid formula ID' });
     }
-  });
-
-  // Scenario routes
-  app.get('/api/workspaces/:workspaceId/scenarios', authenticateUser, async (req, res) => {
-    try {
-      const workspaceId = parseInt(req.params.workspaceId);
-      const workspace = await storage.getWorkspace(workspaceId);
-      
-      if (!workspace) {
-        return res.status(404).json({ message: 'Workspace not found' });
-      }
-      
-      // Verify ownership
-      const user = (req as any).user;
-      if (workspace.ownerId !== user.id) {
-        return res.status(403).json({ message: 'Not authorized to access this workspace' });
-      }
-      
-      const scenarios = await storage.getScenariosByWorkspaceId(workspaceId);
-      res.status(200).json(scenarios);
-    } catch (error) {
-      console.error('Error fetching scenarios:', error);
-      res.status(500).json({ message: 'Server error' });
+    
+    const success = await storage.deleteCustomFormula(formulaId);
+    if (!success) {
+      return res.status(404).json({ message: 'Custom formula not found' });
     }
+    
+    return res.status(204).end();
   });
-
-  app.post('/api/workspaces/:workspaceId/scenarios', authenticateUser, async (req, res) => {
-    try {
-      const workspaceId = parseInt(req.params.workspaceId);
-      const workspace = await storage.getWorkspace(workspaceId);
-      
-      if (!workspace) {
-        return res.status(404).json({ message: 'Workspace not found' });
-      }
-      
-      // Verify ownership
-      const user = (req as any).user;
-      if (workspace.ownerId !== user.id) {
-        return res.status(403).json({ message: 'Not authorized to access this workspace' });
-      }
-      
-      const scenarioData = insertScenarioSchema.parse({
-        ...req.body,
-        workspaceId
-      });
-      
-      const scenario = await storage.createScenario(scenarioData);
-      res.status(201).json(scenario);
-    } catch (error) {
-      handleZodError(error, res);
-    }
-  });
-
-  app.post('/api/workspaces/:workspaceId/scenarios/:id/activate', authenticateUser, async (req, res) => {
-    try {
-      const workspaceId = parseInt(req.params.workspaceId);
-      const scenarioId = parseInt(req.params.id);
-      
-      const workspace = await storage.getWorkspace(workspaceId);
-      
-      if (!workspace) {
-        return res.status(404).json({ message: 'Workspace not found' });
-      }
-      
-      // Verify ownership
-      const user = (req as any).user;
-      if (workspace.ownerId !== user.id) {
-        return res.status(403).json({ message: 'Not authorized to access this workspace' });
-      }
-      
-      const success = await storage.setActiveScenario(scenarioId, workspaceId);
-      
-      if (!success) {
-        return res.status(404).json({ message: 'Scenario not found' });
-      }
-      
-      res.status(200).json({ message: 'Scenario activated successfully' });
-    } catch (error) {
-      console.error('Error activating scenario:', error);
-      res.status(500).json({ message: 'Server error' });
-    }
-  });
-
+  
   // QuickBooks Integration routes
-  app.get('/api/workspaces/:workspaceId/quickbooks', authenticateUser, async (req, res) => {
+  app.get('/api/quickbooks-integration/:userId', async (req: Request, res: Response) => {
+    const userId = parseInt(req.params.userId);
+    if (isNaN(userId)) {
+      return res.status(400).json({ message: 'Invalid user ID' });
+    }
+    
+    const integration = await storage.getQuickbooksIntegrationByUserId(userId);
+    if (!integration) {
+      return res.status(404).json({ message: 'QuickBooks integration not found' });
+    }
+    
+    return res.json(integration);
+  });
+  
+  app.post('/api/quickbooks-integration', async (req: Request, res: Response) => {
     try {
-      const workspaceId = parseInt(req.params.workspaceId);
-      const workspace = await storage.getWorkspace(workspaceId);
-      
-      if (!workspace) {
-        return res.status(404).json({ message: 'Workspace not found' });
+      const integrationData = insertQuickbooksIntegrationSchema.parse(req.body);
+      const integration = await storage.createQuickbooksIntegration(integrationData);
+      return res.status(201).json(integration);
+    } catch (err) {
+      return handleValidationError(err, res);
+    }
+  });
+  
+  app.put('/api/quickbooks-integration/:userId', async (req: Request, res: Response) => {
+    try {
+      const userId = parseInt(req.params.userId);
+      if (isNaN(userId)) {
+        return res.status(400).json({ message: 'Invalid user ID' });
       }
       
-      // Verify ownership
-      const user = (req as any).user;
-      if (workspace.ownerId !== user.id) {
-        return res.status(403).json({ message: 'Not authorized to access this workspace' });
-      }
+      const integrationData = insertQuickbooksIntegrationSchema.partial().parse(req.body);
+      const updatedIntegration = await storage.updateQuickbooksIntegration(userId, integrationData);
       
-      const integration = await storage.getQuickbooksIntegration(workspaceId);
-      
-      if (!integration) {
+      if (!updatedIntegration) {
         return res.status(404).json({ message: 'QuickBooks integration not found' });
       }
       
-      // Don't return sensitive data
-      const { accessToken, refreshToken, ...safeData } = integration;
-      res.status(200).json(safeData);
-    } catch (error) {
-      console.error('Error fetching QuickBooks integration:', error);
-      res.status(500).json({ message: 'Server error' });
+      return res.json(updatedIntegration);
+    } catch (err) {
+      return handleValidationError(err, res);
     }
   });
-
-  app.post('/api/workspaces/:workspaceId/quickbooks', authenticateUser, async (req, res) => {
+  
+  app.delete('/api/quickbooks-integration/:userId', async (req: Request, res: Response) => {
+    const userId = parseInt(req.params.userId);
+    if (isNaN(userId)) {
+      return res.status(400).json({ message: 'Invalid user ID' });
+    }
+    
+    const success = await storage.deleteQuickbooksIntegration(userId);
+    if (!success) {
+      return res.status(404).json({ message: 'QuickBooks integration not found' });
+    }
+    
+    return res.status(204).end();
+  });
+  
+  // Financial Projection routes
+  app.get('/api/financial-projections', async (req: Request, res: Response) => {
+    const forecastId = Number(req.query.forecastId);
+    if (isNaN(forecastId)) {
+      return res.status(400).json({ message: 'Invalid forecast ID' });
+    }
+    
+    const projections = await storage.getFinancialProjectionsByForecastId(forecastId);
+    return res.json(projections);
+  });
+  
+  app.get('/api/financial-projections/:id', async (req: Request, res: Response) => {
+    const projectionId = parseInt(req.params.id);
+    if (isNaN(projectionId)) {
+      return res.status(400).json({ message: 'Invalid projection ID' });
+    }
+    
+    const projection = await storage.getFinancialProjection(projectionId);
+    if (!projection) {
+      return res.status(404).json({ message: 'Financial projection not found' });
+    }
+    
+    return res.json(projection);
+  });
+  
+  app.post('/api/financial-projections', async (req: Request, res: Response) => {
     try {
-      const workspaceId = parseInt(req.params.workspaceId);
-      const workspace = await storage.getWorkspace(workspaceId);
-      
-      if (!workspace) {
-        return res.status(404).json({ message: 'Workspace not found' });
-      }
-      
-      // Verify ownership
-      const user = (req as any).user;
-      if (workspace.ownerId !== user.id) {
-        return res.status(403).json({ message: 'Not authorized to access this workspace' });
-      }
-      
-      const integrationData = insertQuickbooksIntegrationSchema.parse({
-        ...req.body,
-        workspaceId
-      });
-      
-      const integration = await storage.createOrUpdateQuickbooksIntegration(integrationData);
-      
-      // Don't return sensitive data
-      const { accessToken, refreshToken, ...safeData } = integration;
-      res.status(201).json(safeData);
-    } catch (error) {
-      handleZodError(error, res);
+      const projectionData = insertFinancialProjectionSchema.parse(req.body);
+      const projection = await storage.createFinancialProjection(projectionData);
+      return res.status(201).json(projection);
+    } catch (err) {
+      return handleValidationError(err, res);
     }
   });
-
-  app.post('/api/workspaces/:workspaceId/quickbooks/disconnect', authenticateUser, async (req, res) => {
+  
+  app.put('/api/financial-projections/:id', async (req: Request, res: Response) => {
     try {
-      const workspaceId = parseInt(req.params.workspaceId);
-      const workspace = await storage.getWorkspace(workspaceId);
-      
-      if (!workspace) {
-        return res.status(404).json({ message: 'Workspace not found' });
+      const projectionId = parseInt(req.params.id);
+      if (isNaN(projectionId)) {
+        return res.status(400).json({ message: 'Invalid projection ID' });
       }
       
-      // Verify ownership
-      const user = (req as any).user;
-      if (workspace.ownerId !== user.id) {
-        return res.status(403).json({ message: 'Not authorized to access this workspace' });
+      const projectionData = insertFinancialProjectionSchema.partial().parse(req.body);
+      const updatedProjection = await storage.updateFinancialProjection(projectionId, projectionData);
+      
+      if (!updatedProjection) {
+        return res.status(404).json({ message: 'Financial projection not found' });
       }
       
-      const success = await storage.disconnectQuickbooksIntegration(workspaceId);
-      
-      if (!success) {
-        return res.status(404).json({ message: 'QuickBooks integration not found' });
-      }
-      
-      res.status(200).json({ message: 'QuickBooks integration disconnected successfully' });
-    } catch (error) {
-      console.error('Error disconnecting QuickBooks integration:', error);
-      res.status(500).json({ message: 'Server error' });
+      return res.json(updatedProjection);
+    } catch (err) {
+      return handleValidationError(err, res);
     }
   });
-
-  // Transaction routes
-  app.get('/api/workspaces/:workspaceId/transactions', authenticateUser, async (req, res) => {
+  
+  app.delete('/api/financial-projections/:id', async (req: Request, res: Response) => {
+    const projectionId = parseInt(req.params.id);
+    if (isNaN(projectionId)) {
+      return res.status(400).json({ message: 'Invalid projection ID' });
+    }
+    
+    const success = await storage.deleteFinancialProjection(projectionId);
+    if (!success) {
+      return res.status(404).json({ message: 'Financial projection not found' });
+    }
+    
+    return res.status(204).end();
+  });
+  
+  // Calculate formula endpoint
+  app.post('/api/calculate-formula', (req: Request, res: Response) => {
     try {
-      const workspaceId = parseInt(req.params.workspaceId);
-      const limit = req.query.limit ? parseInt(req.query.limit as string) : undefined;
+      const { formula, variables } = req.body;
       
-      const workspace = await storage.getWorkspace(workspaceId);
-      
-      if (!workspace) {
-        return res.status(404).json({ message: 'Workspace not found' });
+      if (!formula || typeof formula !== 'string') {
+        return res.status(400).json({ message: 'Formula is required and must be a string' });
       }
       
-      // Verify ownership
-      const user = (req as any).user;
-      if (workspace.ownerId !== user.id) {
-        return res.status(403).json({ message: 'Not authorized to access this workspace' });
+      if (!variables || typeof variables !== 'object') {
+        return res.status(400).json({ message: 'Variables must be provided as an object' });
       }
       
-      const transactions = await storage.getTransactionsByWorkspaceId(workspaceId, limit);
-      res.status(200).json(transactions);
-    } catch (error) {
-      console.error('Error fetching transactions:', error);
-      res.status(500).json({ message: 'Server error' });
+      // In a real implementation, this would use a math expression evaluation library
+      // For the MVP, we'll just return a placeholder result
+      return res.json({ result: 1000000 });
+    } catch (err) {
+      console.error('Error calculating formula:', err);
+      return res.status(500).json({ message: 'Error calculating formula' });
     }
   });
 
-  app.post('/api/workspaces/:workspaceId/transactions', authenticateUser, async (req, res) => {
-    try {
-      const workspaceId = parseInt(req.params.workspaceId);
-      const workspace = await storage.getWorkspace(workspaceId);
-      
-      if (!workspace) {
-        return res.status(404).json({ message: 'Workspace not found' });
-      }
-      
-      // Verify ownership
-      const user = (req as any).user;
-      if (workspace.ownerId !== user.id) {
-        return res.status(403).json({ message: 'Not authorized to access this workspace' });
-      }
-      
-      const transactionData = insertTransactionSchema.parse({
-        ...req.body,
-        workspaceId
-      });
-      
-      const transaction = await storage.createTransaction(transactionData);
-      res.status(201).json(transaction);
-    } catch (error) {
-      handleZodError(error, res);
-    }
-  });
-
-  // Create HTTP server
   const httpServer = createServer(app);
-
   return httpServer;
 }
