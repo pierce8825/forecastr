@@ -9,8 +9,14 @@ import {
   PersonnelRole, InsertPersonnelRole,
   CustomFormula, InsertCustomFormula,
   QuickbooksIntegration, InsertQuickbooksIntegration,
-  FinancialProjection, InsertFinancialProjection
+  FinancialProjection, InsertFinancialProjection,
+  users, forecasts, revenueDrivers, revenueStreams, revenueDriverToStream,
+  expenses, departments, personnelRoles, customFormulas, quickbooksIntegrations,
+  financialProjections
 } from "@shared/schema";
+
+import { db } from "./db";
+import { eq, and } from "drizzle-orm";
 
 export interface IStorage {
   // User operations
@@ -91,795 +97,467 @@ export interface IStorage {
   deleteFinancialProjection(id: number): Promise<boolean>;
 }
 
-export class MemStorage implements IStorage {
-  private users: Map<number, User>;
-  private forecasts: Map<number, Forecast>;
-  private revenueDrivers: Map<number, RevenueDriver>;
-  private revenueStreams: Map<number, RevenueStream>;
-  private driverStreamMappings: Map<number, RevenueDriverToStream>;
-  private expenses: Map<number, Expense>;
-  private departments: Map<number, Department>;
-  private personnelRoles: Map<number, PersonnelRole>;
-  private customFormulas: Map<number, CustomFormula>;
-  private quickbooksIntegrations: Map<number, QuickbooksIntegration>;
-  private financialProjections: Map<number, FinancialProjection>;
-  
-  private currentUserId: number;
-  private currentForecastId: number;
-  private currentRevenueDriverId: number;
-  private currentRevenueStreamId: number;
-  private currentDriverStreamMappingId: number;
-  private currentExpenseId: number;
-  private currentDepartmentId: number;
-  private currentPersonnelRoleId: number;
-  private currentCustomFormulaId: number;
-  private currentQuickbooksIntegrationId: number;
-  private currentFinancialProjectionId: number;
-
-  constructor() {
-    this.users = new Map();
-    this.forecasts = new Map();
-    this.revenueDrivers = new Map();
-    this.revenueStreams = new Map();
-    this.driverStreamMappings = new Map();
-    this.expenses = new Map();
-    this.departments = new Map();
-    this.personnelRoles = new Map();
-    this.customFormulas = new Map();
-    this.quickbooksIntegrations = new Map();
-    this.financialProjections = new Map();
-    
-    this.currentUserId = 1;
-    this.currentForecastId = 1;
-    this.currentRevenueDriverId = 1;
-    this.currentRevenueStreamId = 1;
-    this.currentDriverStreamMappingId = 1;
-    this.currentExpenseId = 1;
-    this.currentDepartmentId = 1;
-    this.currentPersonnelRoleId = 1;
-    this.currentCustomFormulaId = 1;
-    this.currentQuickbooksIntegrationId = 1;
-    this.currentFinancialProjectionId = 1;
-    
-    // Initialize with demo data
-    this.initializeDemoData();
-  }
-
-  private initializeDemoData() {
-    // Create a demo user
-    const demoUser: InsertUser = {
-      username: "demo",
-      password: "password",
-      email: "demo@example.com",
-      companyName: "Demo Company"
-    };
-    
-    const user = this.createUser(demoUser);
-    
-    // Create a demo forecast
-    const demoForecast: InsertForecast = {
-      userId: user.id,
-      name: "2023 Growth Plan",
-      description: "Financial forecast for 2023 growth",
-      currency: "USD"
-    };
-    
-    const forecast = this.createForecast(demoForecast);
-    
-    // Create demo revenue drivers
-    const demoRevenueDrivers: InsertRevenueDriver[] = [
-      {
-        forecastId: forecast.id,
-        name: "Monthly Active Users",
-        value: "45200",
-        unit: "users",
-        minValue: "0",
-        maxValue: "100000",
-        growthRate: "0.024", // 2.4%
-        category: "usage"
-      },
-      {
-        forecastId: forecast.id,
-        name: "Conversion Rate",
-        value: "5.8",
-        unit: "%",
-        minValue: "0",
-        maxValue: "10",
-        growthRate: "0.003", // 0.3%
-        category: "conversion"
-      },
-      {
-        forecastId: forecast.id,
-        name: "ARPU",
-        value: "89",
-        unit: "USD",
-        minValue: "0",
-        maxValue: "100",
-        growthRate: "0.052", // 5.2%
-        category: "monetization"
-      }
-    ];
-    
-    demoRevenueDrivers.forEach(driver => this.createRevenueDriver(driver));
-    
-    // Create demo revenue streams
-    const demoRevenueStreams: InsertRevenueStream[] = [
-      {
-        forecastId: forecast.id,
-        name: "Subscription Revenue",
-        type: "subscription",
-        amount: "1850400",
-        frequency: "annual",
-        growthRate: "0.182", // 18.2%
-        category: "core"
-      },
-      {
-        forecastId: forecast.id,
-        name: "Service Revenue",
-        type: "service",
-        amount: "452800",
-        frequency: "annual",
-        growthRate: "0.057", // 5.7%
-        category: "services"
-      },
-      {
-        forecastId: forecast.id,
-        name: "One-time Sales",
-        type: "one-time",
-        amount: "155000",
-        frequency: "annual",
-        growthRate: "-0.023", // -2.3%
-        category: "other"
-      }
-    ];
-    
-    const streams = demoRevenueStreams.map(stream => this.createRevenueStream(stream));
-    
-    // Create demo driver-stream mappings
-    const demoDriverStreamMappings: InsertRevenueDriverToStream[] = [
-      {
-        driverId: 1,  // Monthly Active Users
-        streamId: 1,  // Subscription Revenue
-        formula: "value * 0.058 * 89",  // MAU * conversion rate * ARPU
-        multiplier: "1"
-      },
-      {
-        driverId: 2,  // Conversion Rate
-        streamId: 1,  // Subscription Revenue
-        formula: "45200 * value * 89",  // MAU * conversion rate * ARPU
-        multiplier: "1"
-      },
-      {
-        driverId: 3,  // ARPU
-        streamId: 1,  // Subscription Revenue
-        formula: "45200 * 0.058 * value",  // MAU * conversion rate * ARPU
-        multiplier: "1"
-      },
-      {
-        driverId: 1,  // Monthly Active Users
-        streamId: 2,  // Service Revenue
-        formula: "value * 0.01 * 100",  // MAU * 1% * $100
-        multiplier: "1"
-      }
-    ];
-    
-    demoDriverStreamMappings.forEach(mapping => this.createDriverStreamMapping(mapping));
-    
-    // Create demo departments
-    const demoDepartments: InsertDepartment[] = [
-      {
-        forecastId: forecast.id,
-        name: "Engineering"
-      },
-      {
-        forecastId: forecast.id,
-        name: "Sales"
-      },
-      {
-        forecastId: forecast.id,
-        name: "Marketing"
-      }
-    ];
-    
-    const departments = demoDepartments.map(dept => this.createDepartment(dept));
-    
-    // Create demo personnel roles
-    const demoPersonnelRoles: InsertPersonnelRole[] = [
-      {
-        forecastId: forecast.id,
-        departmentId: departments[0].id,
-        title: "Software Engineer",
-        count: 18,
-        plannedCount: 22,
-        annualSalary: "125000",
-        benefits: "0.2", // 20% benefits
-      },
-      {
-        forecastId: forecast.id,
-        departmentId: departments[1].id,
-        title: "Sales Representative",
-        count: 12,
-        plannedCount: 15,
-        annualSalary: "110000",
-        benefits: "0.15", // 15% benefits
-      },
-      {
-        forecastId: forecast.id,
-        departmentId: departments[2].id,
-        title: "Marketing Specialist",
-        count: 8,
-        plannedCount: 10,
-        annualSalary: "95000",
-        benefits: "0.18", // 18% benefits
-      }
-    ];
-    
-    demoPersonnelRoles.forEach(role => this.createPersonnelRole(role));
-    
-    // Create demo expenses
-    const demoExpenses: InsertExpense[] = [
-      {
-        forecastId: forecast.id,
-        name: "Marketing Expense",
-        amount: "18400",
-        frequency: "monthly",
-        category: "Marketing",
-        isCogsRelated: false
-      },
-      {
-        forecastId: forecast.id,
-        name: "Software Subscriptions",
-        amount: "12350",
-        frequency: "monthly",
-        category: "Software",
-        isCogsRelated: false
-      },
-      {
-        forecastId: forecast.id,
-        name: "Office Rent",
-        amount: "6750",
-        frequency: "monthly",
-        category: "Office",
-        isCogsRelated: false
-      },
-      {
-        forecastId: forecast.id,
-        name: "Miscellaneous",
-        amount: "3850",
-        frequency: "monthly",
-        category: "Other",
-        isCogsRelated: false
-      }
-    ];
-    
-    demoExpenses.forEach(expense => this.createExpense(expense));
-    
-    // Create demo custom formulas
-    const demoFormulas: InsertCustomFormula[] = [
-      {
-        forecastId: forecast.id,
-        name: "Annual MRR",
-        formula: "Monthly Active Users * Conversion Rate * ARPU * 12",
-        description: "Calculates Annual MRR based on core metrics",
-        category: "Revenue"
-      },
-      {
-        forecastId: forecast.id,
-        name: "CAC Payback Period",
-        formula: "Customer Acquisition Cost / (ARPU * Gross Margin)",
-        description: "Months to recover CAC",
-        category: "Metrics"
-      }
-    ];
-    
-    demoFormulas.forEach(formula => this.createCustomFormula(formula));
-    
-    // Create demo financial projections
-    const demoProjections: InsertFinancialProjection[] = [
-      {
-        forecastId: forecast.id,
-        period: "01-2023",
-        revenueTotal: "215000",
-        cogsTotal: "65000",
-        expenseTotal: "120000",
-        personnelTotal: "84250",
-        netProfit: "30000",
-        cashInflow: "215000",
-        cashOutflow: "185000",
-        cashBalance: "980000",
-        projectionData: {}
-      },
-      {
-        forecastId: forecast.id,
-        period: "02-2023",
-        revenueTotal: "220000",
-        cogsTotal: "68000",
-        expenseTotal: "127000",
-        personnelTotal: "84250",
-        netProfit: "25000",
-        cashInflow: "220000",
-        cashOutflow: "195000",
-        cashBalance: "1005000",
-        projectionData: {}
-      },
-      {
-        forecastId: forecast.id,
-        period: "03-2023",
-        revenueTotal: "205000",
-        cogsTotal: "62000",
-        expenseTotal: "148000",
-        personnelTotal: "84250",
-        netProfit: "-5000",
-        cashInflow: "205000",
-        cashOutflow: "210000",
-        cashBalance: "1000000",
-        projectionData: {}
-      },
-      {
-        forecastId: forecast.id,
-        period: "04-2023",
-        revenueTotal: "235000",
-        cogsTotal: "71000",
-        expenseTotal: "134000",
-        personnelTotal: "84250",
-        netProfit: "30000",
-        cashInflow: "235000",
-        cashOutflow: "205000",
-        cashBalance: "1030000",
-        projectionData: {}
-      }
-    ];
-    
-    demoProjections.forEach(projection => this.createFinancialProjection(projection));
-  }
-
-  // User methods
+// Use database storage implementation
+export class DatabaseStorage implements IStorage {
   async getUser(id: number): Promise<User | undefined> {
-    return this.users.get(id);
+    const [user] = await db.select().from(users).where(eq(users.id, id));
+    return user || undefined;
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(
-      (user) => user.username === username,
-    );
+    const [user] = await db.select().from(users).where(eq(users.username, username));
+    return user || undefined;
   }
-  
+
   async getUserByEmail(email: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(
-      (user) => user.email === email,
-    );
+    const [user] = await db.select().from(users).where(eq(users.email, email));
+    return user || undefined;
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {
-    const id = this.currentUserId++;
-    const now = new Date();
-    const user: User = { ...insertUser, id, createdAt: now };
-    this.users.set(id, user);
+    const [user] = await db
+      .insert(users)
+      .values(insertUser)
+      .returning();
     return user;
   }
   
-  // Forecast methods
+  // Forecast operations
   async getForecastsByUserId(userId: number): Promise<Forecast[]> {
-    return Array.from(this.forecasts.values()).filter(
-      (forecast) => forecast.userId === userId,
-    );
+    return await db
+      .select()
+      .from(forecasts)
+      .where(eq(forecasts.userId, userId));
   }
-  
+
   async getForecast(id: number): Promise<Forecast | undefined> {
-    return this.forecasts.get(id);
+    const [forecast] = await db
+      .select()
+      .from(forecasts)
+      .where(eq(forecasts.id, id));
+    return forecast || undefined;
   }
-  
+
   async createForecast(insertForecast: InsertForecast): Promise<Forecast> {
-    const id = this.currentForecastId++;
-    const now = new Date();
-    const forecast: Forecast = { ...insertForecast, id, createdAt: now, updatedAt: now };
-    this.forecasts.set(id, forecast);
+    const [forecast] = await db
+      .insert(forecasts)
+      .values(insertForecast)
+      .returning();
     return forecast;
   }
-  
+
   async updateForecast(id: number, updateData: Partial<InsertForecast>): Promise<Forecast | undefined> {
-    const forecast = await this.getForecast(id);
-    if (!forecast) return undefined;
-    
-    const updatedForecast: Forecast = {
-      ...forecast,
-      ...updateData,
-      updatedAt: new Date()
-    };
-    
-    this.forecasts.set(id, updatedForecast);
-    return updatedForecast;
+    const [updatedForecast] = await db
+      .update(forecasts)
+      .set(updateData)
+      .where(eq(forecasts.id, id))
+      .returning();
+    return updatedForecast || undefined;
   }
-  
+
   async deleteForecast(id: number): Promise<boolean> {
-    return this.forecasts.delete(id);
+    const [deletedForecast] = await db
+      .delete(forecasts)
+      .where(eq(forecasts.id, id))
+      .returning();
+    return !!deletedForecast;
   }
   
-  // Revenue Driver methods
+  // Revenue Driver operations
   async getRevenueDriversByForecastId(forecastId: number): Promise<RevenueDriver[]> {
-    return Array.from(this.revenueDrivers.values()).filter(
-      (driver) => driver.forecastId === forecastId,
-    );
+    return await db
+      .select()
+      .from(revenueDrivers)
+      .where(eq(revenueDrivers.forecastId, forecastId));
   }
-  
+
   async getRevenueDriver(id: number): Promise<RevenueDriver | undefined> {
-    return this.revenueDrivers.get(id);
+    const [driver] = await db
+      .select()
+      .from(revenueDrivers)
+      .where(eq(revenueDrivers.id, id));
+    return driver || undefined;
   }
-  
+
   async createRevenueDriver(insertDriver: InsertRevenueDriver): Promise<RevenueDriver> {
-    const id = this.currentRevenueDriverId++;
-    const now = new Date();
-    const driver: RevenueDriver = { ...insertDriver, id, createdAt: now, updatedAt: now };
-    this.revenueDrivers.set(id, driver);
+    const [driver] = await db
+      .insert(revenueDrivers)
+      .values(insertDriver)
+      .returning();
     return driver;
   }
-  
+
   async updateRevenueDriver(id: number, updateData: Partial<InsertRevenueDriver>): Promise<RevenueDriver | undefined> {
-    const driver = await this.getRevenueDriver(id);
-    if (!driver) return undefined;
-    
-    const updatedDriver: RevenueDriver = {
-      ...driver,
-      ...updateData,
-      updatedAt: new Date()
-    };
-    
-    this.revenueDrivers.set(id, updatedDriver);
-    return updatedDriver;
+    const [updatedDriver] = await db
+      .update(revenueDrivers)
+      .set(updateData)
+      .where(eq(revenueDrivers.id, id))
+      .returning();
+    return updatedDriver || undefined;
   }
-  
+
   async deleteRevenueDriver(id: number): Promise<boolean> {
-    return this.revenueDrivers.delete(id);
+    const [deletedDriver] = await db
+      .delete(revenueDrivers)
+      .where(eq(revenueDrivers.id, id))
+      .returning();
+    return !!deletedDriver;
   }
   
-  // Revenue Stream methods
+  // Revenue Stream operations
   async getRevenueStreamsByForecastId(forecastId: number): Promise<RevenueStream[]> {
-    return Array.from(this.revenueStreams.values()).filter(
-      (stream) => stream.forecastId === forecastId,
-    );
+    return await db
+      .select()
+      .from(revenueStreams)
+      .where(eq(revenueStreams.forecastId, forecastId));
   }
-  
+
   async getRevenueStream(id: number): Promise<RevenueStream | undefined> {
-    return this.revenueStreams.get(id);
+    const [stream] = await db
+      .select()
+      .from(revenueStreams)
+      .where(eq(revenueStreams.id, id));
+    return stream || undefined;
   }
-  
+
   async createRevenueStream(insertStream: InsertRevenueStream): Promise<RevenueStream> {
-    const id = this.currentRevenueStreamId++;
-    const now = new Date();
-    const stream: RevenueStream = { ...insertStream, id, createdAt: now, updatedAt: now };
-    this.revenueStreams.set(id, stream);
+    const [stream] = await db
+      .insert(revenueStreams)
+      .values(insertStream)
+      .returning();
     return stream;
   }
-  
+
   async updateRevenueStream(id: number, updateData: Partial<InsertRevenueStream>): Promise<RevenueStream | undefined> {
-    const stream = await this.getRevenueStream(id);
-    if (!stream) return undefined;
-    
-    const updatedStream: RevenueStream = {
-      ...stream,
-      ...updateData,
-      updatedAt: new Date()
-    };
-    
-    this.revenueStreams.set(id, updatedStream);
-    return updatedStream;
+    const [updatedStream] = await db
+      .update(revenueStreams)
+      .set(updateData)
+      .where(eq(revenueStreams.id, id))
+      .returning();
+    return updatedStream || undefined;
   }
-  
+
   async deleteRevenueStream(id: number): Promise<boolean> {
-    return this.revenueStreams.delete(id);
+    const [deletedStream] = await db
+      .delete(revenueStreams)
+      .where(eq(revenueStreams.id, id))
+      .returning();
+    return !!deletedStream;
   }
   
-  // Revenue Driver to Stream Mapping methods
-  async getDriverStreamMappingsByForecastId(forecastId: number): Promise<(RevenueDriverToStream & { driver: RevenueDriver, stream: RevenueStream })[]> {
-    const allMappings = Array.from(this.driverStreamMappings.values());
-    const result: (RevenueDriverToStream & { driver: RevenueDriver, stream: RevenueStream })[] = [];
-    
-    for (const mapping of allMappings) {
-      const driver = await this.getRevenueDriver(mapping.driverId);
-      const stream = await this.getRevenueStream(mapping.streamId);
+  // Revenue Driver to Stream Mapping operations
+  async getDriverStreamMappingsByForecastId(forecastId: number): Promise<(RevenueDriverToStream & { driver: RevenueDriver; stream: RevenueStream })[]> {
+    const mappings = await db
+      .select()
+      .from(revenueDriverToStream)
+      .innerJoin(revenueDrivers, eq(revenueDriverToStream.driverId, revenueDrivers.id))
+      .innerJoin(revenueStreams, eq(revenueDriverToStream.streamId, revenueStreams.id))
+      .where(eq(revenueDrivers.forecastId, forecastId));
       
-      if (driver && stream && driver.forecastId === forecastId && stream.forecastId === forecastId) {
-        result.push({
-          ...mapping,
-          driver,
-          stream
-        });
-      }
-    }
-    
-    return result;
+    return mappings.map(m => ({
+      ...m.revenue_driver_to_stream,
+      driver: m.revenue_drivers,
+      stream: m.revenue_streams
+    }));
   }
-  
+
   async getDriverStreamMappingsByDriverId(driverId: number): Promise<(RevenueDriverToStream & { stream: RevenueStream })[]> {
-    const allMappings = Array.from(this.driverStreamMappings.values());
-    const result: (RevenueDriverToStream & { stream: RevenueStream })[] = [];
-    
-    for (const mapping of allMappings) {
-      if (mapping.driverId === driverId) {
-        const stream = await this.getRevenueStream(mapping.streamId);
-        if (stream) {
-          result.push({
-            ...mapping,
-            stream
-          });
-        }
-      }
-    }
-    
-    return result;
+    const mappings = await db
+      .select()
+      .from(revenueDriverToStream)
+      .innerJoin(revenueStreams, eq(revenueDriverToStream.streamId, revenueStreams.id))
+      .where(eq(revenueDriverToStream.driverId, driverId));
+      
+    return mappings.map(m => ({
+      ...m.revenue_driver_to_stream,
+      stream: m.revenue_streams
+    }));
   }
-  
+
   async getDriverStreamMappingsByStreamId(streamId: number): Promise<(RevenueDriverToStream & { driver: RevenueDriver })[]> {
-    const allMappings = Array.from(this.driverStreamMappings.values());
-    const result: (RevenueDriverToStream & { driver: RevenueDriver })[] = [];
-    
-    for (const mapping of allMappings) {
-      if (mapping.streamId === streamId) {
-        const driver = await this.getRevenueDriver(mapping.driverId);
-        if (driver) {
-          result.push({
-            ...mapping,
-            driver
-          });
-        }
-      }
-    }
-    
-    return result;
+    const mappings = await db
+      .select()
+      .from(revenueDriverToStream)
+      .innerJoin(revenueDrivers, eq(revenueDriverToStream.driverId, revenueDrivers.id))
+      .where(eq(revenueDriverToStream.streamId, streamId));
+      
+    return mappings.map(m => ({
+      ...m.revenue_driver_to_stream,
+      driver: m.revenue_drivers
+    }));
   }
-  
+
   async createDriverStreamMapping(insertMapping: InsertRevenueDriverToStream): Promise<RevenueDriverToStream> {
-    const id = this.currentDriverStreamMappingId++;
-    const now = new Date();
-    const mapping: RevenueDriverToStream = { ...insertMapping, id, createdAt: now, updatedAt: now };
-    this.driverStreamMappings.set(id, mapping);
+    const [mapping] = await db
+      .insert(revenueDriverToStream)
+      .values(insertMapping)
+      .returning();
     return mapping;
   }
-  
+
   async updateDriverStreamMapping(id: number, updateData: Partial<InsertRevenueDriverToStream>): Promise<RevenueDriverToStream | undefined> {
-    const mapping = this.driverStreamMappings.get(id);
-    if (!mapping) return undefined;
-    
-    const updatedMapping: RevenueDriverToStream = {
-      ...mapping,
-      ...updateData,
-      updatedAt: new Date()
-    };
-    
-    this.driverStreamMappings.set(id, updatedMapping);
-    return updatedMapping;
+    const [updatedMapping] = await db
+      .update(revenueDriverToStream)
+      .set(updateData)
+      .where(eq(revenueDriverToStream.id, id))
+      .returning();
+    return updatedMapping || undefined;
   }
-  
+
   async deleteDriverStreamMapping(id: number): Promise<boolean> {
-    return this.driverStreamMappings.delete(id);
+    const [deletedMapping] = await db
+      .delete(revenueDriverToStream)
+      .where(eq(revenueDriverToStream.id, id))
+      .returning();
+    return !!deletedMapping;
   }
   
-  // Expense methods
+  // Expense operations
   async getExpensesByForecastId(forecastId: number): Promise<Expense[]> {
-    return Array.from(this.expenses.values()).filter(
-      (expense) => expense.forecastId === forecastId,
-    );
+    return await db
+      .select()
+      .from(expenses)
+      .where(eq(expenses.forecastId, forecastId));
   }
-  
+
   async getExpense(id: number): Promise<Expense | undefined> {
-    return this.expenses.get(id);
+    const [expense] = await db
+      .select()
+      .from(expenses)
+      .where(eq(expenses.id, id));
+    return expense || undefined;
   }
-  
+
   async createExpense(insertExpense: InsertExpense): Promise<Expense> {
-    const id = this.currentExpenseId++;
-    const now = new Date();
-    const expense: Expense = { ...insertExpense, id, createdAt: now, updatedAt: now };
-    this.expenses.set(id, expense);
+    const [expense] = await db
+      .insert(expenses)
+      .values(insertExpense)
+      .returning();
     return expense;
   }
-  
+
   async updateExpense(id: number, updateData: Partial<InsertExpense>): Promise<Expense | undefined> {
-    const expense = await this.getExpense(id);
-    if (!expense) return undefined;
-    
-    const updatedExpense: Expense = {
-      ...expense,
-      ...updateData,
-      updatedAt: new Date()
-    };
-    
-    this.expenses.set(id, updatedExpense);
-    return updatedExpense;
+    const [updatedExpense] = await db
+      .update(expenses)
+      .set(updateData)
+      .where(eq(expenses.id, id))
+      .returning();
+    return updatedExpense || undefined;
   }
-  
+
   async deleteExpense(id: number): Promise<boolean> {
-    return this.expenses.delete(id);
+    const [deletedExpense] = await db
+      .delete(expenses)
+      .where(eq(expenses.id, id))
+      .returning();
+    return !!deletedExpense;
   }
   
-  // Department methods
+  // Department operations
   async getDepartmentsByForecastId(forecastId: number): Promise<Department[]> {
-    return Array.from(this.departments.values()).filter(
-      (department) => department.forecastId === forecastId,
-    );
+    return await db
+      .select()
+      .from(departments)
+      .where(eq(departments.forecastId, forecastId));
   }
-  
+
   async getDepartment(id: number): Promise<Department | undefined> {
-    return this.departments.get(id);
+    const [department] = await db
+      .select()
+      .from(departments)
+      .where(eq(departments.id, id));
+    return department || undefined;
   }
-  
+
   async createDepartment(insertDepartment: InsertDepartment): Promise<Department> {
-    const id = this.currentDepartmentId++;
-    const now = new Date();
-    const department: Department = { ...insertDepartment, id, createdAt: now, updatedAt: now };
-    this.departments.set(id, department);
+    const [department] = await db
+      .insert(departments)
+      .values(insertDepartment)
+      .returning();
     return department;
   }
-  
+
   async updateDepartment(id: number, updateData: Partial<InsertDepartment>): Promise<Department | undefined> {
-    const department = await this.getDepartment(id);
-    if (!department) return undefined;
-    
-    const updatedDepartment: Department = {
-      ...department,
-      ...updateData,
-      updatedAt: new Date()
-    };
-    
-    this.departments.set(id, updatedDepartment);
-    return updatedDepartment;
+    const [updatedDepartment] = await db
+      .update(departments)
+      .set(updateData)
+      .where(eq(departments.id, id))
+      .returning();
+    return updatedDepartment || undefined;
   }
-  
+
   async deleteDepartment(id: number): Promise<boolean> {
-    return this.departments.delete(id);
+    const [deletedDepartment] = await db
+      .delete(departments)
+      .where(eq(departments.id, id))
+      .returning();
+    return !!deletedDepartment;
   }
   
-  // Personnel Role methods
+  // Personnel Role operations
   async getPersonnelRolesByForecastId(forecastId: number): Promise<PersonnelRole[]> {
-    return Array.from(this.personnelRoles.values()).filter(
-      (role) => role.forecastId === forecastId,
-    );
+    return await db
+      .select()
+      .from(personnelRoles)
+      .where(eq(personnelRoles.forecastId, forecastId));
   }
-  
+
   async getPersonnelRolesByDepartmentId(departmentId: number): Promise<PersonnelRole[]> {
-    return Array.from(this.personnelRoles.values()).filter(
-      (role) => role.departmentId === departmentId,
-    );
+    return await db
+      .select()
+      .from(personnelRoles)
+      .where(eq(personnelRoles.departmentId, departmentId));
   }
-  
+
   async getPersonnelRole(id: number): Promise<PersonnelRole | undefined> {
-    return this.personnelRoles.get(id);
+    const [role] = await db
+      .select()
+      .from(personnelRoles)
+      .where(eq(personnelRoles.id, id));
+    return role || undefined;
   }
-  
+
   async createPersonnelRole(insertRole: InsertPersonnelRole): Promise<PersonnelRole> {
-    const id = this.currentPersonnelRoleId++;
-    const now = new Date();
-    const role: PersonnelRole = { ...insertRole, id, createdAt: now, updatedAt: now };
-    this.personnelRoles.set(id, role);
+    const [role] = await db
+      .insert(personnelRoles)
+      .values(insertRole)
+      .returning();
     return role;
   }
-  
+
   async updatePersonnelRole(id: number, updateData: Partial<InsertPersonnelRole>): Promise<PersonnelRole | undefined> {
-    const role = await this.getPersonnelRole(id);
-    if (!role) return undefined;
-    
-    const updatedRole: PersonnelRole = {
-      ...role,
-      ...updateData,
-      updatedAt: new Date()
-    };
-    
-    this.personnelRoles.set(id, updatedRole);
-    return updatedRole;
+    const [updatedRole] = await db
+      .update(personnelRoles)
+      .set(updateData)
+      .where(eq(personnelRoles.id, id))
+      .returning();
+    return updatedRole || undefined;
   }
-  
+
   async deletePersonnelRole(id: number): Promise<boolean> {
-    return this.personnelRoles.delete(id);
+    const [deletedRole] = await db
+      .delete(personnelRoles)
+      .where(eq(personnelRoles.id, id))
+      .returning();
+    return !!deletedRole;
   }
   
-  // Custom Formula methods
+  // Custom Formula operations
   async getCustomFormulasByForecastId(forecastId: number): Promise<CustomFormula[]> {
-    return Array.from(this.customFormulas.values()).filter(
-      (formula) => formula.forecastId === forecastId,
-    );
+    return await db
+      .select()
+      .from(customFormulas)
+      .where(eq(customFormulas.forecastId, forecastId));
   }
-  
+
   async getCustomFormula(id: number): Promise<CustomFormula | undefined> {
-    return this.customFormulas.get(id);
+    const [formula] = await db
+      .select()
+      .from(customFormulas)
+      .where(eq(customFormulas.id, id));
+    return formula || undefined;
   }
-  
+
   async createCustomFormula(insertFormula: InsertCustomFormula): Promise<CustomFormula> {
-    const id = this.currentCustomFormulaId++;
-    const now = new Date();
-    const formula: CustomFormula = { ...insertFormula, id, createdAt: now, updatedAt: now };
-    this.customFormulas.set(id, formula);
+    const [formula] = await db
+      .insert(customFormulas)
+      .values(insertFormula)
+      .returning();
     return formula;
   }
-  
+
   async updateCustomFormula(id: number, updateData: Partial<InsertCustomFormula>): Promise<CustomFormula | undefined> {
-    const formula = await this.getCustomFormula(id);
-    if (!formula) return undefined;
-    
-    const updatedFormula: CustomFormula = {
-      ...formula,
-      ...updateData,
-      updatedAt: new Date()
-    };
-    
-    this.customFormulas.set(id, updatedFormula);
-    return updatedFormula;
+    const [updatedFormula] = await db
+      .update(customFormulas)
+      .set(updateData)
+      .where(eq(customFormulas.id, id))
+      .returning();
+    return updatedFormula || undefined;
   }
-  
+
   async deleteCustomFormula(id: number): Promise<boolean> {
-    return this.customFormulas.delete(id);
+    const [deletedFormula] = await db
+      .delete(customFormulas)
+      .where(eq(customFormulas.id, id))
+      .returning();
+    return !!deletedFormula;
   }
   
-  // QuickBooks Integration methods
+  // QuickBooks Integration operations
   async getQuickbooksIntegrationByUserId(userId: number): Promise<QuickbooksIntegration | undefined> {
-    return Array.from(this.quickbooksIntegrations.values()).find(
-      (integration) => integration.userId === userId,
-    );
+    const [integration] = await db
+      .select()
+      .from(quickbooksIntegrations)
+      .where(eq(quickbooksIntegrations.userId, userId));
+    return integration || undefined;
   }
-  
+
   async createQuickbooksIntegration(insertIntegration: InsertQuickbooksIntegration): Promise<QuickbooksIntegration> {
-    const id = this.currentQuickbooksIntegrationId++;
-    const now = new Date();
-    const integration: QuickbooksIntegration = { ...insertIntegration, id, createdAt: now, updatedAt: now };
-    this.quickbooksIntegrations.set(id, integration);
+    const [integration] = await db
+      .insert(quickbooksIntegrations)
+      .values(insertIntegration)
+      .returning();
     return integration;
   }
-  
+
   async updateQuickbooksIntegration(userId: number, updateData: Partial<InsertQuickbooksIntegration>): Promise<QuickbooksIntegration | undefined> {
-    const integration = await this.getQuickbooksIntegrationByUserId(userId);
-    if (!integration) return undefined;
-    
-    const updatedIntegration: QuickbooksIntegration = {
-      ...integration,
-      ...updateData,
-      updatedAt: new Date()
-    };
-    
-    this.quickbooksIntegrations.set(integration.id, updatedIntegration);
-    return updatedIntegration;
+    const [updatedIntegration] = await db
+      .update(quickbooksIntegrations)
+      .set(updateData)
+      .where(eq(quickbooksIntegrations.userId, userId))
+      .returning();
+    return updatedIntegration || undefined;
   }
-  
+
   async deleteQuickbooksIntegration(userId: number): Promise<boolean> {
-    const integration = await this.getQuickbooksIntegrationByUserId(userId);
-    if (!integration) return false;
-    
-    return this.quickbooksIntegrations.delete(integration.id);
+    const [deletedIntegration] = await db
+      .delete(quickbooksIntegrations)
+      .where(eq(quickbooksIntegrations.userId, userId))
+      .returning();
+    return !!deletedIntegration;
   }
   
-  // Financial Projection methods
+  // Financial Projection operations
   async getFinancialProjectionsByForecastId(forecastId: number): Promise<FinancialProjection[]> {
-    return Array.from(this.financialProjections.values()).filter(
-      (projection) => projection.forecastId === forecastId,
-    );
+    return await db
+      .select()
+      .from(financialProjections)
+      .where(eq(financialProjections.forecastId, forecastId));
   }
-  
+
   async getFinancialProjection(id: number): Promise<FinancialProjection | undefined> {
-    return this.financialProjections.get(id);
+    const [projection] = await db
+      .select()
+      .from(financialProjections)
+      .where(eq(financialProjections.id, id));
+    return projection || undefined;
   }
-  
+
   async createFinancialProjection(insertProjection: InsertFinancialProjection): Promise<FinancialProjection> {
-    const id = this.currentFinancialProjectionId++;
-    const now = new Date();
-    const projection: FinancialProjection = { ...insertProjection, id, createdAt: now, updatedAt: now };
-    this.financialProjections.set(id, projection);
+    const [projection] = await db
+      .insert(financialProjections)
+      .values(insertProjection)
+      .returning();
     return projection;
   }
-  
+
   async updateFinancialProjection(id: number, updateData: Partial<InsertFinancialProjection>): Promise<FinancialProjection | undefined> {
-    const projection = await this.getFinancialProjection(id);
-    if (!projection) return undefined;
-    
-    const updatedProjection: FinancialProjection = {
-      ...projection,
-      ...updateData,
-      updatedAt: new Date()
-    };
-    
-    this.financialProjections.set(id, updatedProjection);
-    return updatedProjection;
+    const [updatedProjection] = await db
+      .update(financialProjections)
+      .set(updateData)
+      .where(eq(financialProjections.id, id))
+      .returning();
+    return updatedProjection || undefined;
   }
-  
+
   async deleteFinancialProjection(id: number): Promise<boolean> {
-    return this.financialProjections.delete(id);
+    const [deletedProjection] = await db
+      .delete(financialProjections)
+      .where(eq(financialProjections.id, id))
+      .returning();
+    return !!deletedProjection;
   }
 }
 
-export const storage = new MemStorage();
+// Export an instance of the database storage implementation
+export const storage = new DatabaseStorage();
