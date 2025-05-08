@@ -216,50 +216,51 @@ const Payroll = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  <TableRow>
-                    <TableCell className="font-medium">John Smith</TableCell>
-                    <TableCell>Engineering</TableCell>
-                    <TableCell>Senior Developer</TableCell>
-                    <TableCell>Jan 15, 2023</TableCell>
-                    <TableCell className="text-right">$95,000</TableCell>
-                    <TableCell className="text-right">
-                      <Button variant="ghost" size="sm" onClick={() => window.alert("Viewing John Smith's details")}>View</Button>
-                      <Button variant="ghost" size="sm" className="ml-2" onClick={() => window.alert("Editing John Smith's information")}>Edit</Button>
-                    </TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell className="font-medium">Sarah Johnson</TableCell>
-                    <TableCell>Marketing</TableCell>
-                    <TableCell>Marketing Director</TableCell>
-                    <TableCell>Mar 3, 2022</TableCell>
-                    <TableCell className="text-right">$110,000</TableCell>
-                    <TableCell className="text-right">
-                      <Button variant="ghost" size="sm" onClick={() => window.alert("Viewing Sarah Johnson's details")}>View</Button>
-                      <Button variant="ghost" size="sm" className="ml-2" onClick={() => window.alert("Editing Sarah Johnson's information")}>Edit</Button>
-                    </TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell className="font-medium">Michael Chen</TableCell>
-                    <TableCell>Finance</TableCell>
-                    <TableCell>Financial Analyst</TableCell>
-                    <TableCell>Jul 10, 2024</TableCell>
-                    <TableCell className="text-right">$85,000</TableCell>
-                    <TableCell className="text-right">
-                      <Button variant="ghost" size="sm" onClick={() => window.alert("Viewing Michael Chen's details")}>View</Button>
-                      <Button variant="ghost" size="sm" className="ml-2" onClick={() => window.alert("Editing Michael Chen's information")}>Edit</Button>
-                    </TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell className="font-medium">Emma Rodriguez</TableCell>
-                    <TableCell>Sales</TableCell>
-                    <TableCell>Account Executive</TableCell>
-                    <TableCell>Feb 22, 2023</TableCell>
-                    <TableCell className="text-right">$78,500</TableCell>
-                    <TableCell className="text-right">
-                      <Button variant="ghost" size="sm" onClick={() => window.alert("Viewing Emma Rodriguez's details")}>View</Button>
-                      <Button variant="ghost" size="sm" className="ml-2" onClick={() => window.alert("Editing Emma Rodriguez's information")}>Edit</Button>
-                    </TableCell>
-                  </TableRow>
+                  {isLoading ? (
+                    Array(4).fill(0).map((_, index) => (
+                      <TableRow key={index}>
+                        <TableCell><Skeleton className="h-6 w-[120px]" /></TableCell>
+                        <TableCell><Skeleton className="h-6 w-[100px]" /></TableCell>
+                        <TableCell><Skeleton className="h-6 w-[140px]" /></TableCell>
+                        <TableCell><Skeleton className="h-6 w-[100px]" /></TableCell>
+                        <TableCell className="text-right"><Skeleton className="h-6 w-[80px] ml-auto" /></TableCell>
+                        <TableCell className="text-right"><Skeleton className="h-6 w-[120px] ml-auto" /></TableCell>
+                      </TableRow>
+                    ))
+                  ) : isError ? (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center py-4 text-red-500">
+                        Error loading employees: {error?.message || "Failed to load employees"}
+                      </TableCell>
+                    </TableRow>
+                  ) : employees?.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center py-6 text-muted-foreground">
+                        No employees found. Add your first employee to get started.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    employees?.map((employee) => (
+                      <TableRow key={employee.id}>
+                        <TableCell className="font-medium">{`${employee.firstName} ${employee.lastName}`}</TableCell>
+                        <TableCell>{employee.departmentId ? `Dept ${employee.departmentId}` : "Unassigned"}</TableCell>
+                        <TableCell>{employee.role}</TableCell>
+                        <TableCell>{new Date(employee.startDate).toLocaleDateString()}</TableCell>
+                        <TableCell className="text-right">${employee.salary.toLocaleString()}</TableCell>
+                        <TableCell className="text-right">
+                          <Button variant="ghost" size="icon" onClick={() => window.alert(`Viewing ${employee.firstName}'s details`)}>
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="ml-1" onClick={() => window.alert(`Editing ${employee.firstName}'s information`)}>
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="ml-1 text-red-500 hover:text-red-600" onClick={() => window.alert(`Delete ${employee.firstName}?`)}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
                 </TableBody>
               </Table>
             </div>
