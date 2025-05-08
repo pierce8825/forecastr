@@ -197,6 +197,7 @@ export function PersonnelRoles({ forecastId, isLoading }: PersonnelRolesProps) {
                     <div className="text-xs text-gray-500 mt-1">
                       Base: {formatAmount(Number(role.annualSalary))}
                     </div>
+                    <PaystubGenerator personnelRole={role} />
                   </div>
                 </div>
                 
