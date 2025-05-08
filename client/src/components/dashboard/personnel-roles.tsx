@@ -115,8 +115,8 @@ export function PersonnelRoles({ forecastId, isLoading }: PersonnelRolesProps) {
   };
 
   // Calculate total compensation
-  const calculateTotalComp = (salary: number, benefits: number, taxes: number) => {
-    return salary + (salary * benefits / 100) + (salary * taxes / 100);
+  const calculateTotalComp = (salary: number, benefits: number) => {
+    return salary + (salary * benefits / 100);
   };
 
   // Get department name by ID
@@ -176,9 +176,12 @@ export function PersonnelRoles({ forecastId, isLoading }: PersonnelRolesProps) {
                         <BriefcaseIcon className="h-3 w-3 mr-1" />
                         {getDepartmentName(role.departmentId)}
                       </Badge>
-                      <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-200">
+                      <Badge variant="outline" className="mr-2 text-xs bg-green-50 text-green-700 border-green-200">
                         <Users className="h-3 w-3 mr-1" />
-                        {role.headcount} {role.headcount > 1 ? 'people' : 'person'}
+                        {role.count} {role.count > 1 ? 'people' : 'person'}
+                      </Badge>
+                      <Badge variant="outline" className="text-xs bg-purple-50 text-purple-700 border-purple-200">
+                        {role.employmentType || 'W2'}
                       </Badge>
                     </div>
                   </div>
@@ -187,8 +190,7 @@ export function PersonnelRoles({ forecastId, isLoading }: PersonnelRolesProps) {
                     <div className="text-sm font-tabular font-medium text-gray-900">
                       {formatAmount(calculateTotalComp(
                         Number(role.annualSalary),
-                        Number(role.benefits || 0),
-                        Number(role.taxes || 0)
+                        Number(role.benefits || 0)
                       ))}
                       <span className="text-xs text-gray-500 ml-1">/year</span>
                     </div>
