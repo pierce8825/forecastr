@@ -285,7 +285,7 @@ export async function getBalanceSheet(userId: number, date: string) {
     const qbo = await createQBClient(userId);
     
     return new Promise<any>((resolve, reject) => {
-      qbo.report('BalanceSheet', {
+      qbo.reportBalanceSheet({
         report_date: date,
       }, (err: Error | null, report: any) => {
         if (err) {
@@ -308,7 +308,7 @@ export async function getCashFlow(userId: number, startDate: string, endDate: st
     const qbo = await createQBClient(userId);
     
     return new Promise<any>((resolve, reject) => {
-      qbo.report('CashFlow', {
+      qbo.reportCashFlow({
         start_date: startDate,
         end_date: endDate,
       }, (err: Error | null, report: any) => {
@@ -332,7 +332,7 @@ export async function getGeneralLedger(userId: number, startDate: string, endDat
     const qbo = await createQBClient(userId);
     
     return new Promise<any>((resolve, reject) => {
-      qbo.report('GeneralLedger', {
+      qbo.reportGeneralLedgerDetail({
         start_date: startDate,
         end_date: endDate,
       }, (err: Error | null, report: any) => {
