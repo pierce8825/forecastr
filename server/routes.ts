@@ -16,6 +16,7 @@ import {
 } from "@shared/schema";
 import { ZodError } from "zod";
 import { fromZodError } from "zod-validation-error";
+import { registerQuickbooksRoutes } from "./routes/quickbooks";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Error handler for validation errors
@@ -773,6 +774,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(500).json({ message: 'Error calculating formula' });
     }
   });
+  
+  // Register QuickBooks routes from separate file
+  registerQuickbooksRoutes(app);
 
   const httpServer = createServer(app);
   return httpServer;

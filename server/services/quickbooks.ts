@@ -1,4 +1,4 @@
-import { OAuthClient } from 'intuit-oauth';
+import OAuthClient from 'intuit-oauth';
 import QuickBooks from 'node-quickbooks';
 import { eq } from 'drizzle-orm';
 import { db } from '../db';
@@ -23,7 +23,7 @@ const oauthClient = new OAuthClient({
  */
 export function getAuthorizationUrl() {
   const authUri = oauthClient.authorizeUri({
-    scope: [OAuthClient.scopes.Accounting],
+    scope: ['com.intuit.quickbooks.accounting'], // Accounting scope for QuickBooks API
     state: 'testState',
   });
   return authUri;
@@ -201,7 +201,7 @@ export async function getAccounts(userId: number) {
     const qbo = await createQBClient(userId);
     
     return new Promise<any>((resolve, reject) => {
-      qbo.findAccounts({}, (err: Error, accounts: any) => {
+      qbo.findAccounts({}, (err: Error | null, accounts: any) => {
         if (err) {
           return reject(err);
         }
@@ -255,7 +255,7 @@ export async function getProfitAndLoss(userId: number, startDate: string, endDat
       qbo.reportProfitAndLoss({
         start_date: startDate,
         end_date: endDate,
-      }, (err: Error, report: any) => {
+      }, (err: Error | null, report: any) => {
         if (err) {
           return reject(err);
         }
