@@ -20,9 +20,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Calendar, Plus, Download, Filter, Search, UserPlus, UserIcon } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { EmployeeDialog } from "@/components/payroll/employee-dialog";
 
 const Payroll = () => {
   const [activeTab, setActiveTab] = useState("upcoming");
+  const [showEmployeeDialog, setShowEmployeeDialog] = useState(false);
 
   // Sample payroll data
   const upcomingPayrolls = [
@@ -119,7 +121,7 @@ const Payroll = () => {
               <Plus className="mr-2 h-4 w-4" />
               New Payroll Run
             </Button>
-            <Button variant="outline" onClick={() => window.alert("Add employee dialog will open here")}>
+            <Button variant="outline" onClick={() => setShowEmployeeDialog(true)}>
               <UserPlus className="mr-2 h-4 w-4" />
               Add Employee
             </Button>
@@ -180,7 +182,7 @@ const Payroll = () => {
                   <Download className="mr-2 h-4 w-4" />
                   Export
                 </Button>
-                <Button onClick={() => window.alert("Add new employee dialog will open here")}>
+                <Button onClick={() => setShowEmployeeDialog(true)}>
                   <UserPlus className="mr-2 h-4 w-4" />
                   Add Employee
                 </Button>
@@ -353,6 +355,11 @@ const Payroll = () => {
           </CardContent>
         </Card>
       </div>
+      
+      <EmployeeDialog
+        open={showEmployeeDialog}
+        onOpenChange={setShowEmployeeDialog}
+      />
     </>
   );
 };
