@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Helmet } from "react-helmet";
+import { useQuery } from "@tanstack/react-query";
 import {
   Card,
   CardContent,
@@ -17,14 +18,26 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Calendar, Plus, Download, Filter, Search, UserPlus, UserIcon } from "lucide-react";
+import { Calendar, Plus, Download, Filter, Search, UserPlus, UserIcon, Trash2, Edit, Eye } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useToast } from "@/hooks/use-toast";
 import { EmployeeDialog } from "@/components/payroll/employee-dialog";
 
 const Payroll = () => {
   const [activeTab, setActiveTab] = useState("upcoming");
   const [showEmployeeDialog, setShowEmployeeDialog] = useState(false);
+  const { toast } = useToast();
+  
+  // Fetch employees
+  const { data: employees, isLoading, isError, error } = useQuery({
+    queryKey: ['/api/employees', { userId: 1 }], // Use userId: 1 for demo
+    queryFn: () => fetch('/api/employees?userId=1').then(res => {
+      if (!res.ok) throw new Error('Failed to fetch employees');
+      return res.json();
+    })
+  });
 
   // Sample payroll data
   const upcomingPayrolls = [

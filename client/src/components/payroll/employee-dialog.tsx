@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
 import { z } from "zod";
 import {
   Dialog,
@@ -95,6 +97,7 @@ interface EmployeeDialogProps {
 export function EmployeeDialog({ open, onOpenChange }: EmployeeDialogProps) {
   const [step, setStep] = useState<number>(1);
   const totalSteps = 3;
+  const queryClient = useQueryClient();
 
   const form = useForm<EmployeeFormValues>({
     resolver: zodResolver(employeeFormSchema),
@@ -103,19 +106,59 @@ export function EmployeeDialog({ open, onOpenChange }: EmployeeDialogProps) {
 
   const { toast } = useToast();
   
+  const createEmployeeMutation = useMutation({
+    mutationFn: (employee: any) => apiRequest('/api/employees', 'POST', employee),
+    onSuccess: () => {
+      // Invalidate employees query to refresh the list
+      queryClient.invalidateQueries({ queryKey: ['/api/employees'] });
+      
+      toast({
+        title: "Employee added successfully",
+        description: `${form.getValues().firstName} ${form.getValues().lastName} has been added as a ${form.getValues().employeeType} employee.`,
+      });
+      
+      form.reset();
+      setStep(1);
+      onOpenChange(false);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error adding employee",
+        description: error.message || "There was an error adding the employee. Please try again.",
+        variant: "destructive",
+      });
+    }
+  });
+  
   function onSubmit(data: EmployeeFormValues) {
     if (step < totalSteps) {
       setStep(step + 1);
     } else {
-      // This would typically connect to your API
-      console.log(data);
-      toast({
-        title: "Employee added successfully",
-        description: `${data.firstName} ${data.lastName} has been added as a ${data.employeeType} employee.`,
-      });
-      form.reset();
-      setStep(1);
-      onOpenChange(false);
+      // Map the form data to the API format expected by the backend
+      const employeeData = {
+        userId: 1, // Assuming a default user for demo, in a real app this would come from auth
+        firstName: data.firstName,
+        lastName: data.lastName,
+        email: data.email,
+        phoneNumber: data.phoneNumber,
+        employeeType: data.employeeType,
+        departmentId: parseInt(data.department) || null, // Convert to number or null if it's not a valid number
+        role: data.role,
+        startDate: data.startDate,
+        salary: parseFloat(data.salary) || 0, // Convert to number
+        address: data.address,
+        city: data.city,
+        state: data.state,
+        zipCode: data.zipCode,
+        taxWithholding: data.taxWithholding,
+        isInternational: data.isInternational,
+        benefitsEligible: data.benefitsEligible,
+        emergencyContact: data.emergencyContact,
+        notes: data.notes
+      };
+      
+      // Submit to the API
+      createEmployeeMutation.mutate(employeeData);
     }
   }
 
