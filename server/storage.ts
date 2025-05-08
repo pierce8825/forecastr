@@ -10,9 +10,12 @@ import {
   CustomFormula, InsertCustomFormula,
   PuzzleIntegration, InsertPuzzleIntegration,
   FinancialProjection, InsertFinancialProjection,
+  Employee, InsertEmployee,
+  Payroll, InsertPayroll,
+  PayrollItem, InsertPayrollItem,
   users, forecasts, revenueDrivers, revenueStreams, revenueDriverToStream,
   expenses, departments, personnelRoles, customFormulas, puzzleIntegrations,
-  financialProjections
+  financialProjections, employees, payrolls, payrollItems
 } from "@shared/schema";
 
 import { db } from "./db";
@@ -95,6 +98,29 @@ export interface IStorage {
   createFinancialProjection(projection: InsertFinancialProjection): Promise<FinancialProjection>;
   updateFinancialProjection(id: number, projection: Partial<InsertFinancialProjection>): Promise<FinancialProjection | undefined>;
   deleteFinancialProjection(id: number): Promise<boolean>;
+  
+  // Employee operations
+  getEmployeesByUserId(userId: number): Promise<Employee[]>;
+  getEmployee(id: number): Promise<Employee | undefined>;
+  getEmployeeByEmail(email: string): Promise<Employee | undefined>;
+  createEmployee(employee: InsertEmployee): Promise<Employee>;
+  updateEmployee(id: number, employee: Partial<InsertEmployee>): Promise<Employee | undefined>;
+  deleteEmployee(id: number): Promise<boolean>;
+  
+  // Payroll operations
+  getPayrollsByUserId(userId: number): Promise<Payroll[]>;
+  getPayroll(id: number): Promise<Payroll | undefined>;
+  createPayroll(payroll: InsertPayroll): Promise<Payroll>;
+  updatePayroll(id: number, payroll: Partial<InsertPayroll>): Promise<Payroll | undefined>;
+  deletePayroll(id: number): Promise<boolean>;
+  
+  // PayrollItem operations
+  getPayrollItemsByPayrollId(payrollId: number): Promise<PayrollItem[]>;
+  getPayrollItemsByEmployeeId(employeeId: number): Promise<PayrollItem[]>;
+  getPayrollItem(id: number): Promise<PayrollItem | undefined>;
+  createPayrollItem(payrollItem: InsertPayrollItem): Promise<PayrollItem>;
+  updatePayrollItem(id: number, payrollItem: Partial<InsertPayrollItem>): Promise<PayrollItem | undefined>;
+  deletePayrollItem(id: number): Promise<boolean>;
 }
 
 // Use database storage implementation
@@ -557,7 +583,144 @@ export class DatabaseStorage implements IStorage {
       .returning();
     return !!deletedProjection;
   }
+  
+  // Employee operations
+  async getEmployeesByUserId(userId: number): Promise<Employee[]> {
+    return await db
+      .select()
+      .from(employees)
+      .where(eq(employees.userId, userId));
+  }
+
+  async getEmployee(id: number): Promise<Employee | undefined> {
+    const [employee] = await db
+      .select()
+      .from(employees)
+      .where(eq(employees.id, id));
+    return employee || undefined;
+  }
+
+  async getEmployeeByEmail(email: string): Promise<Employee | undefined> {
+    const [employee] = await db
+      .select()
+      .from(employees)
+      .where(eq(employees.email, email));
+    return employee || undefined;
+  }
+
+  async createEmployee(insertEmployee: InsertEmployee): Promise<Employee> {
+    const [employee] = await db
+      .insert(employees)
+      .values(insertEmployee)
+      .returning();
+    return employee;
+  }
+
+  async updateEmployee(id: number, updateData: Partial<InsertEmployee>): Promise<Employee | undefined> {
+    const [updatedEmployee] = await db
+      .update(employees)
+      .set(updateData)
+      .where(eq(employees.id, id))
+      .returning();
+    return updatedEmployee || undefined;
+  }
+
+  async deleteEmployee(id: number): Promise<boolean> {
+    const [deletedEmployee] = await db
+      .delete(employees)
+      .where(eq(employees.id, id))
+      .returning();
+    return !!deletedEmployee;
+  }
+  
+  // Payroll operations
+  async getPayrollsByUserId(userId: number): Promise<Payroll[]> {
+    return await db
+      .select()
+      .from(payrolls)
+      .where(eq(payrolls.userId, userId));
+  }
+
+  async getPayroll(id: number): Promise<Payroll | undefined> {
+    const [payroll] = await db
+      .select()
+      .from(payrolls)
+      .where(eq(payrolls.id, id));
+    return payroll || undefined;
+  }
+
+  async createPayroll(insertPayroll: InsertPayroll): Promise<Payroll> {
+    const [payroll] = await db
+      .insert(payrolls)
+      .values(insertPayroll)
+      .returning();
+    return payroll;
+  }
+
+  async updatePayroll(id: number, updateData: Partial<InsertPayroll>): Promise<Payroll | undefined> {
+    const [updatedPayroll] = await db
+      .update(payrolls)
+      .set(updateData)
+      .where(eq(payrolls.id, id))
+      .returning();
+    return updatedPayroll || undefined;
+  }
+
+  async deletePayroll(id: number): Promise<boolean> {
+    const [deletedPayroll] = await db
+      .delete(payrolls)
+      .where(eq(payrolls.id, id))
+      .returning();
+    return !!deletedPayroll;
+  }
+  
+  // PayrollItem operations
+  async getPayrollItemsByPayrollId(payrollId: number): Promise<PayrollItem[]> {
+    return await db
+      .select()
+      .from(payrollItems)
+      .where(eq(payrollItems.payrollId, payrollId));
+  }
+
+  async getPayrollItemsByEmployeeId(employeeId: number): Promise<PayrollItem[]> {
+    return await db
+      .select()
+      .from(payrollItems)
+      .where(eq(payrollItems.employeeId, employeeId));
+  }
+
+  async getPayrollItem(id: number): Promise<PayrollItem | undefined> {
+    const [payrollItem] = await db
+      .select()
+      .from(payrollItems)
+      .where(eq(payrollItems.id, id));
+    return payrollItem || undefined;
+  }
+
+  async createPayrollItem(insertPayrollItem: InsertPayrollItem): Promise<PayrollItem> {
+    const [payrollItem] = await db
+      .insert(payrollItems)
+      .values(insertPayrollItem)
+      .returning();
+    return payrollItem;
+  }
+
+  async updatePayrollItem(id: number, updateData: Partial<InsertPayrollItem>): Promise<PayrollItem | undefined> {
+    const [updatedPayrollItem] = await db
+      .update(payrollItems)
+      .set(updateData)
+      .where(eq(payrollItems.id, id))
+      .returning();
+    return updatedPayrollItem || undefined;
+  }
+
+  async deletePayrollItem(id: number): Promise<boolean> {
+    const [deletedPayrollItem] = await db
+      .delete(payrollItems)
+      .where(eq(payrollItems.id, id))
+      .returning();
+    return !!deletedPayrollItem;
+  }
 }
 
-// Export an instance of the database storage implementation
 export const storage = new DatabaseStorage();

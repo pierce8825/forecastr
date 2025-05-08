@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, jsonb, numeric, timestamp, boolean } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, jsonb, numeric, timestamp, boolean, date } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -255,3 +255,87 @@ export type InsertPuzzleIntegration = z.infer<typeof insertPuzzleIntegrationSche
 
 export type FinancialProjection = typeof financialProjections.$inferSelect;
 export type InsertFinancialProjection = z.infer<typeof insertFinancialProjectionSchema>;
+
+// Employee schema
+export const employees = pgTable("employees", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  firstName: text("first_name").notNull(),
+  lastName: text("last_name").notNull(),
+  email: text("email").notNull(),
+  phoneNumber: text("phone_number").notNull(),
+  employeeType: text("employee_type").notNull(), // fullTime, partTime, contractor
+  departmentId: integer("department_id"),
+  role: text("role").notNull(),
+  startDate: date("start_date").notNull(),
+  salary: numeric("salary", { precision: 12, scale: 2 }).notNull(),
+  address: text("address"),
+  city: text("city"),
+  state: text("state"),
+  zipCode: text("zip_code"),
+  taxWithholding: text("tax_withholding"),
+  isInternational: boolean("is_international").default(false),
+  benefitsEligible: boolean("benefits_eligible").default(true),
+  emergencyContact: text("emergency_contact"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertEmployeeSchema = createInsertSchema(employees).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type Employee = typeof employees.$inferSelect;
+export type InsertEmployee = z.infer<typeof insertEmployeeSchema>;
+
+// Payroll schema
+export const payrolls = pgTable("payrolls", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  name: text("name").notNull(),
+  payPeriodStart: date("pay_period_start").notNull(),
+  payPeriodEnd: date("pay_period_end").notNull(),
+  paymentDate: date("payment_date").notNull(),
+  status: text("status").notNull(), // Scheduled, Pending, Completed
+  totalAmount: numeric("total_amount", { precision: 12, scale: 2 }).notNull(),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertPayrollSchema = createInsertSchema(payrolls).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type Payroll = typeof payrolls.$inferSelect;
+export type InsertPayroll = z.infer<typeof insertPayrollSchema>;
+
+// PayrollItem schema (links employees to payrolls)
+export const payrollItems = pgTable("payroll_items", {
+  id: serial("id").primaryKey(),
+  payrollId: integer("payroll_id").notNull(),
+  employeeId: integer("employee_id").notNull(),
+  hoursWorked: numeric("hours_worked", { precision: 8, scale: 2 }),
+  regularPay: numeric("regular_pay", { precision: 12, scale: 2 }).notNull(),
+  overtimePay: numeric("overtime_pay", { precision: 12, scale: 2 }),
+  bonusPay: numeric("bonus_pay", { precision: 12, scale: 2 }),
+  deductions: numeric("deductions", { precision: 12, scale: 2 }),
+  netPay: numeric("net_pay", { precision: 12, scale: 2 }).notNull(),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertPayrollItemSchema = createInsertSchema(payrollItems).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type PayrollItem = typeof payrollItems.$inferSelect;
+export type InsertPayrollItem = z.infer<typeof insertPayrollItemSchema>;
