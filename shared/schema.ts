@@ -134,6 +134,7 @@ export const personnelRoles = pgTable("personnel_roles", {
   endDate: timestamp("end_date"), // When the role ends (optional)
   startingMonth: integer("starting_month"), // Legacy: month number (1-12)
   benefits: numeric("benefits", { precision: 5, scale: 4 }), // percentage of salary
+  employmentType: text("employment_type").default("W2"), // W2, 1099, overseas, etc.
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),

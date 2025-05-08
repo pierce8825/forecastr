@@ -63,7 +63,7 @@ export function PersonnelRoles({ forecastId, isLoading }: PersonnelRolesProps) {
   // Mutation to add a new personnel role
   const addRoleMutation = useMutation({
     mutationFn: async (roleData: any) => {
-      return await apiRequest("POST", "/api/personnel-roles", roleData);
+      return await apiRequest("/api/personnel-roles", "POST", roleData);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/personnel-roles"] });
@@ -91,10 +91,11 @@ export function PersonnelRoles({ forecastId, isLoading }: PersonnelRolesProps) {
       forecastId,
       title: formData.get("title"),
       departmentId: formData.get("departmentId"),
-      headcount: Number(formData.get("headcount")) || 1,
+      count: Number(formData.get("headcount")) || 1,
+      plannedCount: Number(formData.get("headcount")) || 1,
       annualSalary: Number(formData.get("annualSalary")),
       benefits: Number(formData.get("benefits")) || 0,
-      taxes: Number(formData.get("taxes")) || 0,
+      employmentType: formData.get("employmentType") || "W2",
       notes: formData.get("notes") || null,
       startDate: formData.get("startDate") || null,
       endDate: formData.get("endDate") || null,
@@ -310,14 +311,19 @@ export function PersonnelRoles({ forecastId, isLoading }: PersonnelRolesProps) {
                   />
                 </div>
                 <div className="grid gap-2">
-                  <Label htmlFor="taxes">Taxes (% of salary)</Label>
-                  <Input 
-                    id="taxes" 
-                    name="taxes" 
-                    type="number" 
-                    placeholder="15" 
-                    defaultValue="15"
-                  />
+                  <Label htmlFor="employmentType">Employment Type</Label>
+                  <Select name="employmentType" defaultValue="W2">
+                    <SelectTrigger id="employmentType">
+                      <SelectValue placeholder="Select type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="W2">W2 Employee</SelectItem>
+                      <SelectItem value="1099">1099 Contractor</SelectItem>
+                      <SelectItem value="overseas">Overseas Contractor</SelectItem>
+                      <SelectItem value="part-time">Part-Time</SelectItem>
+                      <SelectItem value="intern">Intern</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
               
