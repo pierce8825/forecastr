@@ -15,7 +15,7 @@ import Settings from "@/pages/settings";
 import NotFound from "@/pages/not-found";
 
 // Main layout component
-import { Layout } from "@/components/layout";
+import Layout from "@/components/layout";
 
 function App() {
   return (

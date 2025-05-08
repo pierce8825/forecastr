@@ -1,288 +1,154 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Helmet } from "react-helmet";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { useToast } from "@/hooks/use-toast";
-import { CheckCircle, AlertCircle, ArrowRight, ExternalLink } from "lucide-react";
 import { useQuickbooks } from "@/hooks/use-quickbooks";
-import { Badge } from "@/components/ui/badge";
-import { QuickbooksAccountsList } from "@/components/quickbooks/accounts-list";
-import { QuickbooksFinancialReport } from "@/components/quickbooks/financial-report";
-import { useLocation } from "wouter";
+import { Loader2 } from "lucide-react";
 
 const Settings = () => {
-  const [activeTab, setActiveTab] = useState("account");
-  const [location] = useLocation();
-  const { toast } = useToast();
-  
-  // Parse search params from location
-  const getSearchParams = () => {
-    const searchParams = new URLSearchParams(location.split('?')[1] || '');
-    return searchParams;
-  };
-  
-  // Demo user ID for MVP
-  const userId = 1;
-  
-  // Get QuickBooks integration status
-  const {
-    integration,
-    isConnected,
-    connectQuickbooks,
-    disconnectQuickbooks,
-    isPending,
-    isLoading
-  } = useQuickbooks(userId);
-  
-  // Format date for last connected
-  const formatDate = (date: string | Date) => {
-    if (!date) return "Never";
-    return new Date(date).toLocaleString("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-      hour: "numeric",
-      minute: "2-digit",
-    });
-  };
-  
-  // Handle QuickBooks connection
-  const handleConnectQuickbooks = async () => {
-    try {
-      await connectQuickbooks();
-    } catch (error) {
-      toast({
-        title: "Connection failed",
-        description: "Could not connect to QuickBooks Online",
-        variant: "destructive",
-      });
-    }
-  };
-  
-  // Handle QuickBooks disconnection
-  const handleDisconnectQuickbooks = async () => {
-    try {
-      await disconnectQuickbooks();
-      toast({
-        title: "Successfully disconnected",
-        description: "QuickBooks Online integration has been removed",
-      });
-    } catch (error) {
-      toast({
-        title: "Disconnection failed",
-        description: "Could not disconnect from QuickBooks Online",
-        variant: "destructive",
-      });
-    }
-  };
+  const [activeTab, setActiveTab] = useState("general");
+  const { 
+    isAuthorized, 
+    isAuthorizing,
+    authorizeQuickbooks, 
+    disconnectQuickbooks 
+  } = useQuickbooks();
 
-  // Check for OAuth callback status
-  useEffect(() => {
-    const searchParams = getSearchParams();
-    const status = searchParams.get("status");
-    const message = searchParams.get("message");
-    const tab = searchParams.get("tab");
-    
-    if (tab === "integrations") {
-      setActiveTab("integrations");
-    }
-    
-    if (status === "success") {
-      toast({
-        title: "Connection successful",
-        description: "Successfully connected to QuickBooks Online",
-      });
-    } else if (status === "error") {
-      toast({
-        title: "Connection failed",
-        description: message || "Could not connect to QuickBooks Online",
-        variant: "destructive",
-      });
-    }
-  }, [location, toast]);
-  
   return (
     <>
       <Helmet>
         <title>Settings | FinanceForge</title>
-        <meta name="description" content="Configure your account settings, manage integrations, and customize your financial dashboard." />
+        <meta name="description" content="Configure your account settings and integrations" />
       </Helmet>
       
       <div className="p-6">
-        <div className="flex justify-between items-center mb-6">
-          <div>
-            <h1 className="text-2xl font-bold">Settings</h1>
-            <p className="text-muted-foreground">Manage your account and integrations</p>
-          </div>
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold">Settings</h1>
+          <p className="text-muted-foreground">Configure your account settings and integrations</p>
         </div>
         
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
           <TabsList>
-            <TabsTrigger value="account">Account</TabsTrigger>
+            <TabsTrigger value="general">General</TabsTrigger>
             <TabsTrigger value="integrations">Integrations</TabsTrigger>
             <TabsTrigger value="preferences">Preferences</TabsTrigger>
+            <TabsTrigger value="account">Account</TabsTrigger>
           </TabsList>
           
-          <TabsContent value="account">
+          <TabsContent value="general" className="space-y-4">
             <Card>
               <CardHeader>
-                <CardTitle>Account Information</CardTitle>
-                <CardDescription>Manage your account details and preferences</CardDescription>
+                <CardTitle>General Settings</CardTitle>
+                <CardDescription>Configure your application preferences.</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
                   <div>
-                    <h3 className="text-lg font-medium">User Details</h3>
-                    <div className="grid grid-cols-2 gap-4 mt-2">
-                      <div>
-                        <p className="text-sm font-medium text-muted-foreground">Username</p>
-                        <p>demo</p>
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-muted-foreground">Email</p>
-                        <p>demo@example.com</p>
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-muted-foreground">Company</p>
-                        <p>Demo Company</p>
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-muted-foreground">Account Type</p>
-                        <p>Business</p>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div className="pt-4 border-t">
-                    <Button variant="outline">Edit Profile</Button>
+                    <h3 className="text-lg font-medium">Company Information</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Update your company details that will be displayed in reports and projections.
+                    </p>
                   </div>
                 </div>
               </CardContent>
             </Card>
           </TabsContent>
           
-          <TabsContent value="integrations">
+          <TabsContent value="integrations" className="space-y-4">
             <Card>
               <CardHeader>
-                <CardTitle>Accounting Integrations</CardTitle>
-                <CardDescription>Connect your financial data for real-time comparisons</CardDescription>
+                <CardTitle>QuickBooks Integration</CardTitle>
+                <CardDescription>Connect with QuickBooks Online to import your accounting data.</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  <div className="flex items-start justify-between p-4 border rounded-lg">
-                    <div className="flex items-start space-x-4">
-                      <div className="w-12 h-12 flex items-center justify-center bg-blue-50 rounded-lg">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="28" height="28">
-                          <path fill="#2CA01C" d="M159.4 0H32.2v313.9h127.1V0z"/>
-                          <path fill="#57BA47" d="M307.1 0H159.4v313.9h147.7V0z"/>
-                          <path fill="#38AB21" d="M479.8 0H307.1v313.9h172.7V0z"/>
-                          <path fill="#89DF8F" d="M32.2 354.2H97V512H32.2z"/>
-                          <path fill="#57BA47" d="M97 354.2h85.2V512H97z"/>
-                          <path fill="#2CA01C" d="M182.2 354.2h85.2V512h-85.2z"/>
-                          <path fill="#89DF8F" d="M267.4 354.2h104.2V512H267.4z"/>
-                          <path fill="#57BA47" d="M371.6 354.2h108.2V512H371.6z"/>
-                        </svg>
-                      </div>
-                      <div>
-                        <h3 className="text-lg font-medium">QuickBooks Online</h3>
-                        <p className="text-sm text-muted-foreground">
-                          Connect to your QuickBooks Online account to import transactions, expenses, and revenue.
-                        </p>
-                        <div className="mt-2 space-x-2 flex">
-                          {isConnected ? (
-                            <Badge variant="outline" className="flex items-center bg-green-50 text-green-700 border-green-200">
-                              <CheckCircle className="h-3.5 w-3.5 mr-1" />
-                              Connected
-                            </Badge>
-                          ) : (
-                            <Badge variant="outline" className="flex items-center bg-amber-50 text-amber-700 border-amber-200">
-                              <AlertCircle className="h-3.5 w-3.5 mr-1" />
-                              Not Connected
-                            </Badge>
-                          )}
-                          
-                          {integration && (
-                            <Badge variant="outline" className="text-muted-foreground">
-                              Last updated: {formatDate(integration.updatedAt)}
-                            </Badge>
-                          )}
+                  {isAuthorized ? (
+                    <div className="rounded-md bg-green-50 p-4 dark:bg-green-900/20">
+                      <div className="flex">
+                        <div className="flex-shrink-0">
+                          <svg className="h-5 w-5 text-green-400 dark:text-green-500" viewBox="0 0 20 20" fill="currentColor">
+                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                          </svg>
+                        </div>
+                        <div className="ml-3">
+                          <p className="text-sm font-medium text-green-800 dark:text-green-200">
+                            Your QuickBooks account is connected
+                          </p>
                         </div>
                       </div>
                     </div>
-                    <div>
-                      {isConnected ? (
-                        <Button 
-                          variant="outline" 
-                          onClick={handleDisconnectQuickbooks}
-                          disabled={isPending || isLoading}
-                        >
-                          Disconnect
-                        </Button>
-                      ) : (
-                        <Button 
-                          onClick={handleConnectQuickbooks}
-                          disabled={isPending || isLoading}
-                        >
-                          Connect <ArrowRight className="ml-2 h-4 w-4" />
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                  
-                  {isConnected && (
-                    <div className="space-y-6">
-                      <div className="p-4 border rounded-lg bg-muted/40">
-                        <h4 className="font-medium mb-2">Connected Account Details</h4>
-                        <div className="text-sm space-y-1">
-                          <div className="flex justify-between">
-                            <span className="text-muted-foreground">Company ID:</span>
-                            <span className="font-mono">{integration?.realmId || 'Unknown'}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-muted-foreground">Connected on:</span>
-                            <span>{formatDate(integration?.createdAt || new Date())}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-muted-foreground">Token expires:</span>
-                            <span>{formatDate(integration?.expiresAt || new Date())}</span>
-                          </div>
-                          <div className="mt-3 text-right">
-                            <a 
-                              href={`https://app.qbo.intuit.com/app/homepage`} 
-                              target="_blank" 
-                              rel="noopener noreferrer"
-                              className="text-primary inline-flex items-center text-sm hover:underline"
-                            >
-                              Open QuickBooks Online <ExternalLink className="ml-1 h-3 w-3" />
-                            </a>
-                          </div>
+                  ) : (
+                    <div className="rounded-md bg-blue-50 p-4 dark:bg-blue-900/20">
+                      <div className="flex">
+                        <div className="flex-shrink-0">
+                          <svg className="h-5 w-5 text-blue-400" viewBox="0 0 20 20" fill="currentColor">
+                            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2h-1V9a1 1 0 00-1-1z" clipRule="evenodd" />
+                          </svg>
+                        </div>
+                        <div className="ml-3">
+                          <p className="text-sm font-medium text-blue-800 dark:text-blue-200">
+                            Connect your QuickBooks account to import your accounting data
+                          </p>
                         </div>
                       </div>
-                      
-                      <QuickbooksAccountsList userId={userId} />
-                      <QuickbooksFinancialReport userId={userId} />
                     </div>
                   )}
                 </div>
               </CardContent>
+              <CardFooter className="flex justify-between">
+                {isAuthorized ? (
+                  <Button variant="destructive" onClick={disconnectQuickbooks}>
+                    Disconnect QuickBooks
+                  </Button>
+                ) : (
+                  <Button onClick={authorizeQuickbooks} disabled={isAuthorizing}>
+                    {isAuthorizing ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Connecting...
+                      </>
+                    ) : (
+                      "Connect QuickBooks"
+                    )}
+                  </Button>
+                )}
+              </CardFooter>
             </Card>
           </TabsContent>
           
-          <TabsContent value="preferences">
+          <TabsContent value="preferences" className="space-y-4">
             <Card>
               <CardHeader>
-                <CardTitle>Application Preferences</CardTitle>
-                <CardDescription>Customize your application experience</CardDescription>
+                <CardTitle>Preferences</CardTitle>
+                <CardDescription>Customize your forecasting preferences.</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
                   <div>
-                    <h3 className="text-lg font-medium">General Settings</h3>
-                    <p className="text-sm text-muted-foreground">Configure general application preferences</p>
-                    <div className="mt-4 space-y-2">
-                      <p className="text-muted-foreground text-sm">Preference settings will be implemented in a future update.</p>
-                    </div>
+                    <h3 className="text-lg font-medium">Forecasting Preferences</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Configure default settings for your financial forecasts.
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+          
+          <TabsContent value="account" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Account Settings</CardTitle>
+                <CardDescription>Manage your account information.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div>
+                    <h3 className="text-lg font-medium">Account Information</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Update your account details and subscription information.
+                    </p>
                   </div>
                 </div>
               </CardContent>

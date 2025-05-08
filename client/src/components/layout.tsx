@@ -1,172 +1,115 @@
-import React from "react";
+import { ReactNode } from "react";
 import { Link, useLocation } from "wouter";
+import { cn } from "@/lib/utils";
 import {
-  BarChart2, 
-  DollarSign, 
+  LayoutDashboard,
   TrendingUp, 
-  Users, 
-  Layers, 
-  PieChart, 
+  CreditCard,
+  Users,
+  LineChart,
+  CandlestickChart,
+  FileBarChart,
   Settings,
-  Home,
-  Menu,
-  X
+  LogOut
 } from "lucide-react";
 
-// Navigation items for the sidebar
-const navigationItems = [
-  { name: "Dashboard", href: "/", icon: Home },
-  { name: "Revenue", href: "/revenue", icon: TrendingUp },
-  { name: "Expenses", href: "/expenses", icon: DollarSign },
-  { name: "Personnel", href: "/personnel", icon: Users },
-  { name: "Cash Flow", href: "/cash-flow", icon: BarChart2 },
-  { name: "Projections", href: "/projections", icon: Layers },
-  { name: "Scenarios", href: "/scenarios", icon: PieChart },
-  { name: "Settings", href: "/settings", icon: Settings },
-];
+type SidebarNavProps = {
+  children: ReactNode;
+};
 
-interface LayoutProps {
-  children: React.ReactNode;
-}
-
-export function Layout({ children }: LayoutProps) {
+export default function Layout({ children }: SidebarNavProps) {
   const [location] = useLocation();
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
 
-  // Toggle mobile menu
-  const toggleMobileMenu = () => {
-    setIsMobileMenuOpen(!isMobileMenuOpen);
-  };
+  const navItems = [
+    {
+      title: "Dashboard",
+      href: "/",
+      icon: LayoutDashboard,
+      exact: true
+    },
+    {
+      title: "Revenue",
+      href: "/revenue",
+      icon: TrendingUp
+    },
+    {
+      title: "Expenses",
+      href: "/expenses",
+      icon: CreditCard
+    },
+    {
+      title: "Personnel",
+      href: "/personnel",
+      icon: Users
+    },
+    {
+      title: "Cash Flow",
+      href: "/cash-flow",
+      icon: LineChart
+    },
+    {
+      title: "Projections",
+      href: "/projections",
+      icon: CandlestickChart
+    },
+    {
+      title: "Scenarios",
+      href: "/scenarios",
+      icon: LineChart
+    },
+    {
+      title: "Reports",
+      href: "/reports",
+      icon: FileBarChart
+    },
+    {
+      title: "Settings",
+      href: "/settings",
+      icon: Settings
+    }
+  ];
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Mobile header */}
-      <div className="lg:hidden flex items-center justify-between p-4 border-b">
-        <div className="flex items-center">
-          <Link to="/">
-            <span className="text-xl font-bold bg-gradient-to-r from-primary to-blue-400 text-transparent bg-clip-text">FinanceForge</span>
-          </Link>
+    <div className="flex min-h-screen">
+      {/* Sidebar */}
+      <div className="fixed left-0 top-0 z-20 flex h-full w-64 flex-col border-r bg-background">
+        <div className="flex h-14 items-center border-b px-4">
+          <div className="flex items-center gap-2">
+            <span className="text-xl font-bold bg-gradient-to-r from-indigo-400 to-cyan-400 bg-clip-text text-transparent">
+              FinanceForge
+            </span>
+          </div>
         </div>
-        <button 
-          onClick={toggleMobileMenu} 
-          className="p-2 rounded-md text-gray-500 hover:text-primary hover:bg-gray-100"
-        >
-          {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
-        </button>
-      </div>
-
-      <div className="flex h-[calc(100vh-57px)] lg:h-screen">
-        {/* Sidebar (desktop) */}
-        <div className="hidden lg:flex lg:w-64 lg:flex-col lg:fixed lg:inset-y-0">
-          <div className="flex flex-col flex-grow border-r pt-5 bg-card overflow-y-auto">
-            <div className="flex items-center flex-shrink-0 px-4 mb-5">
-              <Link to="/">
-                <span className="text-2xl font-bold bg-gradient-to-r from-primary to-blue-400 text-transparent bg-clip-text">FinanceForge</span>
+        <div className="flex-1 overflow-auto py-2">
+          <nav className="grid items-start px-2 text-sm">
+            {navItems.map((item, index) => (
+              <Link
+                key={index}
+                href={item.href}
+                className={cn(
+                  "flex items-center gap-3 rounded-lg px-3 py-2 transition-all hover:text-primary",
+                  (item.exact ? location === item.href : location.startsWith(item.href))
+                    ? "bg-muted font-medium text-primary"
+                    : "text-muted-foreground"
+                )}
+              >
+                <item.icon className="h-4 w-4" />
+                {item.title}
               </Link>
-            </div>
-            <div className="mt-5 flex-grow flex flex-col">
-              <nav className="flex-1 px-2 space-y-1">
-                {navigationItems.map((item) => {
-                  const Icon = item.icon;
-                  const isActive = location === item.href;
-                  return (
-                    <Link 
-                      key={item.name} 
-                      href={item.href}
-                    >
-                      <a
-                        className={`
-                          group flex items-center px-2 py-2 text-sm font-medium rounded-md
-                          ${isActive ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}
-                        `}
-                      >
-                        <Icon 
-                          className={`mr-3 flex-shrink-0 h-5 w-5 ${isActive ? 'text-primary-foreground' : 'text-muted-foreground group-hover:text-foreground'}`} 
-                          aria-hidden="true" 
-                        />
-                        {item.name}
-                      </a>
-                    </Link>
-                  );
-                })}
-              </nav>
-            </div>
-            <div className="flex-shrink-0 flex border-t p-4">
-              <div className="flex items-center">
-                <div className="h-9 w-9 bg-primary rounded-full flex items-center justify-center text-primary-foreground">
-                  <span className="text-lg font-medium">D</span>
-                </div>
-                <div className="ml-3">
-                  <p className="text-sm font-medium">Demo User</p>
-                  <p className="text-xs text-muted-foreground">demo@example.com</p>
-                </div>
-              </div>
-            </div>
-          </div>
+            ))}
+          </nav>
         </div>
-
-        {/* Mobile sidebar */}
-        {isMobileMenuOpen && (
-          <div className="lg:hidden fixed inset-0 flex z-40">
-            <div 
-              className="fixed inset-0 bg-black/30" 
-              onClick={() => setIsMobileMenuOpen(false)}
-            />
-            <div className="relative flex-1 flex flex-col max-w-xs w-full bg-card">
-              <div className="flex-1 h-0 pt-5 pb-4 overflow-y-auto">
-                <div className="flex items-center flex-shrink-0 px-4 mb-5">
-                  <Link href="/">
-                    <span className="text-xl font-bold bg-gradient-to-r from-primary to-blue-400 text-transparent bg-clip-text">FinanceForge</span>
-                  </Link>
-                </div>
-                <nav className="mt-5 px-2 space-y-1">
-                  {navigationItems.map((item) => {
-                    const Icon = item.icon;
-                    const isActive = location === item.href;
-                    return (
-                      <Link 
-                        key={item.name} 
-                        href={item.href}
-                        onClick={() => setIsMobileMenuOpen(false)}
-                      >
-                        <a
-                          className={`
-                            group flex items-center px-2 py-2 text-sm font-medium rounded-md
-                            ${isActive ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}
-                          `}
-                        >
-                          <Icon 
-                            className={`mr-3 flex-shrink-0 h-5 w-5 ${isActive ? 'text-primary-foreground' : 'text-muted-foreground group-hover:text-foreground'}`} 
-                            aria-hidden="true" 
-                          />
-                          {item.name}
-                        </a>
-                      </Link>
-                    );
-                  })}
-                </nav>
-              </div>
-              <div className="flex-shrink-0 flex border-t p-4">
-                <div className="flex items-center">
-                  <div className="h-9 w-9 bg-primary rounded-full flex items-center justify-center text-primary-foreground">
-                    <span className="text-lg font-medium">D</span>
-                  </div>
-                  <div className="ml-3">
-                    <p className="text-sm font-medium">Demo User</p>
-                    <p className="text-xs text-muted-foreground">demo@example.com</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Main content */}
-        <div className="lg:pl-64 flex flex-col flex-1">
-          <main className="flex-1">
-            {children}
-          </main>
+        <div className="mt-auto border-t p-4">
+          <button className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary">
+            <LogOut className="h-4 w-4" />
+            <span className="text-sm">Log Out</span>
+          </button>
         </div>
+      </div>
+      
+      {/* Main content */}
+      <div className="flex flex-1 flex-col pl-64">
+        <main className="flex-1">{children}</main>
       </div>
     </div>
   );
