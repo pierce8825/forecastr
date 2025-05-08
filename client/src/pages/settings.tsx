@@ -6,14 +6,23 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { AccountsList } from '@/components/puzzle/accounts-list';
 import { FinancialReport, ReportType } from '@/components/puzzle/financial-report';
-import { usePuzzle } from '@/hooks/use-puzzle';
+import { usePuzzle, PuzzleIntegrationResponse } from '@/hooks/use-puzzle';
 
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState('general');
   const [apiKey, setApiKey] = useState('');
   const [workspaceId, setWorkspaceId] = useState('');
   const { isAuthorized, isConnecting, isLoading, integration, connectPuzzle, disconnectPuzzle } = usePuzzle();
-  const puzzleIntegration = integration as PuzzleIntegrationResponse;
+  // Explicitly define the type for the integration data
+  const puzzleIntegration: {
+    id?: number;
+    userId?: number;
+    workspaceId?: string;
+    lastSync?: string;
+    createdAt?: string;
+    updatedAt?: string;
+    success?: boolean;
+  } = integration || {};
 
   return (
     <div className="space-y-8">
@@ -91,7 +100,7 @@ export default function SettingsPage() {
                     </Button>
                   </div>
 
-                  <AccountsList workspaceId={integration?.workspaceId || ''} />
+                  <AccountsList workspaceId={puzzleIntegration?.workspaceId || ''} />
                 </div>
               ) : (
                 <div className="flex flex-col items-center py-8 text-center">
@@ -144,12 +153,12 @@ export default function SettingsPage() {
           {isAuthorized && (
             <>
               <FinancialReport 
-                workspaceId={integration?.workspaceId || ''}
+                workspaceId={puzzleIntegration?.workspaceId || ''}
                 reportType={ReportType.PROFIT_AND_LOSS}
               />
               
               <FinancialReport 
-                workspaceId={integration?.workspaceId || ''}
+                workspaceId={puzzleIntegration?.workspaceId || ''}
                 reportType={ReportType.BALANCE_SHEET}
               />
             </>
