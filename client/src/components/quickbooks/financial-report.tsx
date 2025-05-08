@@ -1,331 +1,176 @@
-import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { DateRangePicker } from "@/components/ui/date-range-picker";
-import { DateRange } from "react-day-picker";
-import { AlertCircle, Download } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { addDays } from "date-fns";
+import { useState, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
+import { DateRange } from 'react-day-picker';
+import { format, subMonths } from 'date-fns';
+import { DateRangePicker } from '@/components/ui/date-range-picker';
+import { formatCurrency } from '@/lib/utils';
 
-interface QuickbooksFinancialReportProps {
-  userId: number;
+export enum ReportType {
+  PROFIT_AND_LOSS = 'PROFIT_AND_LOSS',
+  BALANCE_SHEET = 'BALANCE_SHEET'
 }
 
-interface ReportItem {
-  name: string;
-  amount: number;
-  items?: ReportItem[];
+interface FinancialReportProps {
+  className?: string;
+  realmId: string;
+  reportType: ReportType;
 }
 
-interface ProfitAndLossReport {
-  income: ReportItem[];
-  expenses: ReportItem[];
-  totalIncome: number;
-  totalExpenses: number;
-  netIncome: number;
-}
-
-interface BalanceSheetReport {
-  assets: ReportItem[];
-  liabilities: ReportItem[];
-  equity: ReportItem[];
-  totalAssets: number;
-  totalLiabilities: number;
-  totalEquity: number;
-}
-
-interface FinancialReportResponse {
-  report: ProfitAndLossReport | BalanceSheetReport;
-}
-
-export function QuickbooksFinancialReport({ userId }: QuickbooksFinancialReportProps) {
-  const [reportType, setReportType] = useState<string>("profit_loss");
+export function FinancialReport({ className, realmId, reportType }: FinancialReportProps) {
   const [dateRange, setDateRange] = useState<DateRange | undefined>({
-    from: addDays(new Date(), -90),
+    from: subMonths(new Date(), 1),
     to: new Date(),
   });
-  
-  const formatDateForApi = (date: Date | undefined) => {
-    if (!date) return '';
-    return date.toISOString().split('T')[0];
-  };
-  
-  const { data, isLoading, error, isFetching } = useQuery<FinancialReportResponse>({
-    queryKey: [
-      '/api/quickbooks/reports', 
-      userId, 
-      reportType, 
-      formatDateForApi(dateRange?.from), 
-      formatDateForApi(dateRange?.to)
-    ],
-    enabled: !!userId && !!dateRange?.from && !!dateRange?.to,
-    staleTime: 5 * 60 * 1000, // 5 minutes
+
+  const formattedFromDate = dateRange?.from ? format(dateRange.from, 'yyyy-MM-dd') : '';
+  const formattedToDate = dateRange?.to ? format(dateRange.to, 'yyyy-MM-dd') : '';
+
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['/api/quickbooks/reports', reportType, realmId, formattedFromDate, formattedToDate],
+    enabled: !!realmId && !!dateRange?.from && !!dateRange?.to,
   });
-  
-  // Format currency
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      maximumFractionDigits: 0,
-    }).format(amount);
+
+  const formatReportTitle = () => {
+    switch (reportType) {
+      case ReportType.PROFIT_AND_LOSS:
+        return 'Profit and Loss';
+      case ReportType.BALANCE_SHEET:
+        return 'Balance Sheet';
+      default:
+        return 'Financial Report';
+    }
   };
-  
-  const handleExport = () => {
-    // Export functionality would be implemented here
-    alert("Export functionality will be implemented in a future update.");
+
+  const formatReportDescription = () => {
+    if (!dateRange?.from || !dateRange?.to) return 'Select a date range';
+    return `${format(dateRange.from, 'MMM dd, yyyy')} to ${format(dateRange.to, 'MMM dd, yyyy')}`;
   };
-  
-  if (isLoading) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Financial Reports</CardTitle>
-          <CardDescription>View your QuickBooks financial reports</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <div className="flex justify-between mb-6">
-              <Skeleton className="h-10 w-48" />
-              <Skeleton className="h-10 w-40" />
-            </div>
-            <Skeleton className="h-5 w-full" />
-            <Skeleton className="h-5 w-3/4" />
-            <Skeleton className="h-5 w-1/2" />
-            {[1, 2, 3, 4, 5, 6].map((i) => (
-              <div key={i} className="mt-2">
-                <Skeleton className="h-4 w-full" />
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
-  
-  if (error) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Financial Reports</CardTitle>
-          <CardDescription>View your QuickBooks financial reports</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Alert variant="destructive">
-            <AlertCircle className="h-4 w-4" />
-            <AlertTitle>Error loading reports</AlertTitle>
-            <AlertDescription>
-              There was a problem loading your QuickBooks financial reports. Please try again later.
-            </AlertDescription>
-          </Alert>
-        </CardContent>
-      </Card>
-    );
-  }
-  
-  // Render financial line items with indentation based on level
-  const renderLineItems = (items: any[] = [], level = 0) => {
-    if (!items || items.length === 0) return null;
-    
-    return items.map((item, index) => (
-      <div key={`${item.name}-${index}`} className="py-1">
-        <div className="flex justify-between">
-          <div 
-            style={{ paddingLeft: `${level * 16}px` }}
-            className={level === 0 ? "font-medium" : "text-sm"}
-          >
-            {item.name}
-          </div>
-          <div className={`font-mono text-sm ${item.amount < 0 ? 'text-red-600' : ''}`}>
-            {formatCurrency(item.amount)}
-          </div>
-        </div>
-        {item.items && renderLineItems(item.items, level + 1)}
-      </div>
-    ));
-  };
-  
+
+  // Extract report sections from the response data
+  const sections = useMemo(() => {
+    if (!data || !data.report) return [];
+
+    if (reportType === ReportType.PROFIT_AND_LOSS) {
+      return [
+        {
+          title: 'Income',
+          data: data.report.income || [],
+          total: data.report.totalIncome || 0
+        },
+        {
+          title: 'Expenses',
+          data: data.report.expenses || [],
+          total: data.report.totalExpenses || 0
+        },
+      ];
+    } else if (reportType === ReportType.BALANCE_SHEET) {
+      return [
+        {
+          title: 'Assets',
+          data: data.report.assets || [],
+          total: data.report.totalAssets || 0
+        },
+        {
+          title: 'Liabilities',
+          data: data.report.liabilities || [],
+          total: data.report.totalLiabilities || 0
+        },
+        {
+          title: 'Equity',
+          data: data.report.equity || [],
+          total: data.report.totalEquity || 0
+        },
+      ];
+    }
+
+    return [];
+  }, [data, reportType]);
+
+  // Calculate total values
+  const netIncome = useMemo(() => {
+    if (!data || !data.report) return 0;
+    if (reportType === ReportType.PROFIT_AND_LOSS) {
+      return (data.report.totalIncome || 0) - (data.report.totalExpenses || 0);
+    }
+    return 0;
+  }, [data, reportType]);
+
   return (
-    <Card>
+    <Card className={className}>
       <CardHeader>
-        <CardTitle>Financial Reports</CardTitle>
-        <CardDescription>View your QuickBooks financial reports</CardDescription>
+        <div className="flex flex-col space-y-2 md:flex-row md:justify-between md:space-y-0">
+          <div>
+            <CardTitle>{formatReportTitle()}</CardTitle>
+            <CardDescription>{formatReportDescription()}</CardDescription>
+          </div>
+          <DateRangePicker
+            value={dateRange}
+            onChange={setDateRange}
+            align="end"
+          />
+        </div>
       </CardHeader>
       <CardContent>
-        <div className="space-y-6">
-          <div className="flex flex-col sm:flex-row justify-between gap-4">
-            <Tabs 
-              defaultValue="profit_loss" 
-              value={reportType} 
-              onValueChange={setReportType}
-              className="w-full sm:w-auto"
-            >
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="profit_loss">Profit & Loss</TabsTrigger>
-                <TabsTrigger value="balance_sheet">Balance Sheet</TabsTrigger>
-              </TabsList>
-            </Tabs>
-            
-            <DateRangePicker
-              dateRange={dateRange}
-              onDateRangeChange={setDateRange}
-              className="w-full sm:w-auto"
-              align="end"
-            />
+        {isLoading && (
+          <div className="space-y-3">
+            <Skeleton className="h-4 w-[250px]" />
+            <Skeleton className="h-4 w-[200px]" />
+            <Skeleton className="h-4 w-[300px]" />
+            <Skeleton className="h-4 w-[250px]" />
+            <Skeleton className="h-4 w-[200px]" />
           </div>
-          
-          {isFetching ? (
-            <div className="py-8 flex justify-center">
-              <div className="animate-pulse text-muted-foreground">Loading report data...</div>
-            </div>
-          ) : !data ? (
-            <div className="py-8 text-center text-muted-foreground">
-              No report data available for the selected period.
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <div className="flex justify-between items-center">
-                <h3 className="text-lg font-semibold">
-                  {reportType === "profit_loss" ? "Profit & Loss" : "Balance Sheet"}
-                </h3>
-                <Button 
-                  onClick={handleExport} 
-                  variant="outline" 
-                  size="sm"
-                  className="flex items-center gap-1 text-xs"
-                >
-                  <Download className="h-3 w-3" />
-                  Export
-                </Button>
+        )}
+
+        {error && (
+          <div className="rounded-md bg-red-50 p-4 dark:bg-red-900/10">
+            <div className="flex">
+              <div className="flex-shrink-0">
+                <svg className="h-5 w-5 text-red-400 dark:text-red-500" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                </svg>
               </div>
-              
-              <div className="divide-y">
-                {reportType === "profit_loss" ? (
-                  <>
-                    <div className="py-3">
-                      <h4 className="font-medium mb-2">Revenue</h4>
-                      {data?.report && 'income' in data.report && 
-                        renderLineItems(data.report.income)}
-                      
-                      <div className="flex justify-between mt-2 border-t pt-2 font-medium">
-                        <div>Total Revenue</div>
-                        <div className="font-mono">
-                          {formatCurrency(
-                            data?.report && 'totalIncome' in data.report 
-                              ? data.report.totalIncome 
-                              : 0
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <div className="py-3">
-                      <h4 className="font-medium mb-2">Expenses</h4>
-                      {data?.report && 'expenses' in data.report && 
-                        renderLineItems(data.report.expenses)}
-                      
-                      <div className="flex justify-between mt-2 border-t pt-2 font-medium">
-                        <div>Total Expenses</div>
-                        <div className="font-mono">
-                          {formatCurrency(
-                            data?.report && 'totalExpenses' in data.report 
-                              ? data.report.totalExpenses 
-                              : 0
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <div className="py-3">
-                      <div className="flex justify-between font-bold">
-                        <div>Net Income</div>
-                        <div className={`font-mono ${
-                          data?.report && 'netIncome' in data.report && data.report.netIncome < 0 
-                            ? 'text-red-600' 
-                            : 'text-green-600'
-                        }`}>
-                          {formatCurrency(
-                            data?.report && 'netIncome' in data.report 
-                              ? data.report.netIncome 
-                              : 0
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div className="py-3">
-                      <h4 className="font-medium mb-2">Assets</h4>
-                      {data?.report && 'assets' in data.report && 
-                        renderLineItems(data.report.assets)}
-                      
-                      <div className="flex justify-between mt-2 border-t pt-2 font-medium">
-                        <div>Total Assets</div>
-                        <div className="font-mono">
-                          {formatCurrency(
-                            data?.report && 'totalAssets' in data.report 
-                              ? data.report.totalAssets 
-                              : 0
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <div className="py-3">
-                      <h4 className="font-medium mb-2">Liabilities</h4>
-                      {data?.report && 'liabilities' in data.report && 
-                        renderLineItems(data.report.liabilities)}
-                      
-                      <div className="flex justify-between mt-2 border-t pt-2 font-medium">
-                        <div>Total Liabilities</div>
-                        <div className="font-mono">
-                          {formatCurrency(
-                            data?.report && 'totalLiabilities' in data.report 
-                              ? data.report.totalLiabilities 
-                              : 0
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <div className="py-3">
-                      <h4 className="font-medium mb-2">Equity</h4>
-                      {data?.report && 'equity' in data.report && 
-                        renderLineItems(data.report.equity)}
-                      
-                      <div className="flex justify-between mt-2 border-t pt-2 font-medium">
-                        <div>Total Equity</div>
-                        <div className="font-mono">
-                          {formatCurrency(
-                            data?.report && 'totalEquity' in data.report 
-                              ? data.report.totalEquity 
-                              : 0
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <div className="py-3">
-                      <div className="flex justify-between font-bold">
-                        <div>Total Liabilities and Equity</div>
-                        <div className="font-mono">
-                          {formatCurrency(
-                            (data?.report && 'totalLiabilities' in data.report ? data.report.totalLiabilities : 0) +
-                            (data?.report && 'totalEquity' in data.report ? data.report.totalEquity : 0)
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </>
-                )}
+              <div className="ml-3">
+                <p className="text-sm font-medium text-red-800 dark:text-red-200">
+                  {error instanceof Error ? error.message : 'Failed to load financial data'}
+                </p>
               </div>
             </div>
-          )}
-        </div>
+          </div>
+        )}
+
+        {!isLoading && !error && data && (
+          <div className="space-y-8">
+            {sections.map((section, index) => (
+              <div key={index} className="space-y-3">
+                <div className="flex items-center justify-between border-b pb-2">
+                  <h3 className="text-md font-medium">{section.title}</h3>
+                  <span className="text-md font-medium">{formatCurrency(section.total)}</span>
+                </div>
+                <div className="space-y-1">
+                  {section.data.map((item: any, itemIndex: number) => (
+                    <div key={itemIndex} className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">{item.name}</span>
+                      <span>{formatCurrency(item.amount)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+
+            {reportType === ReportType.PROFIT_AND_LOSS && (
+              <div className="border-t pt-4">
+                <div className="flex items-center justify-between font-medium">
+                  <h3 className="text-lg">Net Income</h3>
+                  <span className={`text-lg ${netIncome >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                    {formatCurrency(netIncome)}
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </CardContent>
     </Card>
   );

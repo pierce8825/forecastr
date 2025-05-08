@@ -1,8 +1,8 @@
-import { QueryClient } from "@tanstack/react-query";
+import { QueryClient, QueryKey, QueryFunction } from "@tanstack/react-query";
 
 // Define a default query function that will automatically handle
 // errors and send along appropriate headers
-const defaultQueryFn = async ({ queryKey }: { queryKey: string[] }) => {
+const defaultQueryFn: QueryFunction = async ({ queryKey }) => {
   // Get the endpoint to fetch
   const endpoint = queryKey[0];
   
@@ -15,7 +15,7 @@ const defaultQueryFn = async ({ queryKey }: { queryKey: string[] }) => {
   };
   
   // Make the request
-  const response = await fetch(endpoint, options);
+  const response = await fetch(endpoint as string, options);
   
   // Throw an error if the request failed
   if (!response.ok) {

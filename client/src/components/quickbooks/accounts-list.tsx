@@ -1,158 +1,112 @@
-import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle } from "lucide-react";
+import { useQuery } from '@tanstack/react-query';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
+import { formatCurrency } from '@/lib/utils';
 
-interface Account {
-  Id: string;
-  Name: string;
-  AccountType: string;
-  AccountSubType: string;
-  CurrentBalance: number;
-  Active: boolean;
+interface AccountsListProps {
+  className?: string;
+  realmId: string;
 }
 
-interface AccountsResponse {
-  accounts: Account[];
-}
-
-interface QuickbooksAccountsListProps {
-  userId: number;
-}
-
-export function QuickbooksAccountsList({ userId }: QuickbooksAccountsListProps) {
-  const [accountType, setAccountType] = useState<string>("all");
-  
-  const { data, isLoading, error } = useQuery<AccountsResponse>({
-    queryKey: ['/api/quickbooks/accounts', userId],
-    enabled: !!userId,
-    staleTime: 5 * 60 * 1000, // 5 minutes
+export function AccountsList({ className, realmId }: AccountsListProps) {
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['/api/quickbooks/accounts', realmId],
+    enabled: !!realmId,
   });
-  
-  // Filter accounts by type
-  const filteredAccounts = accountType === "all" 
-    ? data?.accounts
-    : data?.accounts?.filter((account) => account.AccountType === accountType);
-  
-  // Get unique account types for filter
-  const accountTypes = data?.accounts
-    ? ["all", ...Array.from(new Set(data.accounts.map((account) => account.AccountType)))]
-    : ["all"];
-  
-  // Format currency
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-    }).format(amount);
-  };
-  
-  if (isLoading) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle>QuickBooks Accounts</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <div className="flex space-x-2 overflow-x-auto pb-2">
-              {[1, 2, 3, 4].map((i) => (
-                <Skeleton key={i} className="h-8 w-20 rounded-full" />
-              ))}
-            </div>
-            <div className="space-y-4">
-              {[1, 2, 3, 4, 5].map((i) => (
-                <div key={i} className="flex justify-between border-b pb-2">
-                  <Skeleton className="h-5 w-40" />
-                  <Skeleton className="h-5 w-24" />
-                </div>
-              ))}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
-  
-  if (error) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle>QuickBooks Accounts</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Alert variant="destructive">
-            <AlertCircle className="h-4 w-4" />
-            <AlertTitle>Error loading accounts</AlertTitle>
-            <AlertDescription>
-              There was a problem loading your QuickBooks accounts. Please try again later.
-            </AlertDescription>
-          </Alert>
-        </CardContent>
-      </Card>
-    );
-  }
-  
+
   return (
-    <Card>
+    <Card className={className}>
       <CardHeader>
-        <CardTitle>QuickBooks Accounts</CardTitle>
+        <CardTitle>Chart of Accounts</CardTitle>
+        <CardDescription>Your QuickBooks accounts list</CardDescription>
       </CardHeader>
       <CardContent>
-        {!data?.accounts || data.accounts.length === 0 ? (
-          <div className="text-center py-8 text-muted-foreground">
-            No accounts found in your QuickBooks Online account.
+        {isLoading && (
+          <div className="space-y-3">
+            <Skeleton className="h-4 w-[250px]" />
+            <Skeleton className="h-4 w-[200px]" />
+            <Skeleton className="h-4 w-[300px]" />
+            <Skeleton className="h-4 w-[250px]" />
+            <Skeleton className="h-4 w-[200px]" />
           </div>
-        ) : (
-          <div className="space-y-4">
-            <div className="flex space-x-2 overflow-x-auto pb-2">
-              {accountTypes.map((type) => (
-                <button
-                  key={type}
-                  onClick={() => setAccountType(type)}
-                  className={`px-3 py-1 text-xs rounded-full whitespace-nowrap ${
-                    accountType === type
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-muted hover:bg-muted/80"
-                  }`}
-                >
-                  {type === "all" ? "All Accounts" : type}
-                </button>
-              ))}
+        )}
+
+        {error && (
+          <div className="rounded-md bg-red-50 p-4 dark:bg-red-900/10">
+            <div className="flex">
+              <div className="flex-shrink-0">
+                <svg className="h-5 w-5 text-red-400 dark:text-red-500" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div className="ml-3">
+                <p className="text-sm font-medium text-red-800 dark:text-red-200">
+                  {error instanceof Error ? error.message : 'Failed to load account data'}
+                </p>
+              </div>
             </div>
+          </div>
+        )}
+
+        {!isLoading && !error && data && data.accounts && (
+          <div className="space-y-6">
+            {/* Assets */}
+            <AccountSection 
+              title="Assets" 
+              accounts={data.accounts.filter((account: any) => account.classification === 'Asset')} 
+            />
             
-            <div className="divide-y">
-              {filteredAccounts?.map((account: Account) => (
-                <div key={account.Id} className="py-2 flex justify-between items-center">
-                  <div>
-                    <div className="font-medium">{account.Name}</div>
-                    <div className="text-xs text-muted-foreground flex items-center gap-1">
-                      <span>{account.AccountType}</span>
-                      {account.AccountSubType && (
-                        <>
-                          <span>•</span>
-                          <span>{account.AccountSubType}</span>
-                        </>
-                      )}
-                      {!account.Active && (
-                        <>
-                          <span>•</span>
-                          <span className="text-amber-600">Inactive</span>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                  <div className={`font-mono text-sm ${account.CurrentBalance < 0 ? 'text-red-600' : ''}`}>
-                    {formatCurrency(account.CurrentBalance)}
-                  </div>
-                </div>
-              ))}
-            </div>
+            {/* Liabilities */}
+            <AccountSection 
+              title="Liabilities" 
+              accounts={data.accounts.filter((account: any) => account.classification === 'Liability')} 
+            />
+            
+            {/* Equity */}
+            <AccountSection 
+              title="Equity" 
+              accounts={data.accounts.filter((account: any) => account.classification === 'Equity')} 
+            />
+            
+            {/* Income */}
+            <AccountSection 
+              title="Income" 
+              accounts={data.accounts.filter((account: any) => account.classification === 'Revenue')} 
+            />
+            
+            {/* Expenses */}
+            <AccountSection 
+              title="Expenses" 
+              accounts={data.accounts.filter((account: any) => account.classification === 'Expense')} 
+            />
           </div>
         )}
       </CardContent>
     </Card>
+  );
+}
+
+interface AccountSectionProps {
+  title: string;
+  accounts: any[];
+}
+
+function AccountSection({ title, accounts }: AccountSectionProps) {
+  if (!accounts || accounts.length === 0) return null;
+  
+  return (
+    <div className="space-y-3">
+      <div className="border-b pb-2">
+        <h3 className="text-md font-medium">{title}</h3>
+      </div>
+      <div className="space-y-1">
+        {accounts.map((account) => (
+          <div key={account.id} className="flex justify-between text-sm">
+            <span className="text-muted-foreground">{account.name}</span>
+            <span>{account.currentBalance !== undefined ? formatCurrency(account.currentBalance) : 'N/A'}</span>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
