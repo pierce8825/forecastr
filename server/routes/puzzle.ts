@@ -6,6 +6,8 @@ import {
   disconnectPuzzle, 
   getPuzzleIntegration, 
   getPuzzleAccounts,
+  getPuzzleCategories,
+  getPuzzleTransactions,
   getPuzzleFinancialReport,
   syncPuzzleData
 } from '../services/puzzle';
@@ -103,31 +105,92 @@ puzzleRouter.get('/accounts/:userId', async (req: Request, res: Response) => {
 });
 
 /**
- * Get financial report from Puzzle.io
+ * Get categories from Puzzle.io
  */
-puzzleRouter.get('/reports/:userId/:reportType', async (req: Request, res: Response) => {
+puzzleRouter.get('/categories/:userId', async (req: Request, res: Response) => {
   try {
     const userId = parseInt(req.params.userId, 10);
-    const { reportType } = req.params;
-    const { startDate, endDate } = req.query;
     
     if (isNaN(userId)) {
       return res.status(400).json({ error: 'Invalid user ID' });
     }
     
-    if (!reportType) {
-      return res.status(400).json({ error: 'Report type is required' });
+    const categories = await getPuzzleCategories(userId);
+    return res.json(categories);
+  } catch (error) {
+    console.error('Error getting Puzzle.io categories:', error);
+    return res.status(500).json({ error: 'Failed to get categories from Puzzle.io' });
+  }
+});
+
+/**
+ * Get transactions from Puzzle.io
+ */
+puzzleRouter.get('/transactions/:userId', async (req: Request, res: Response) => {
+  try {
+    const userId = parseInt(req.params.userId, 10);
+    const { startDate, endDate, page, pageSize } = req.query;
+    
+    if (isNaN(userId)) {
+      return res.status(400).json({ error: 'Invalid user ID' });
     }
     
     if (!startDate || !endDate) {
       return res.status(400).json({ error: 'Start date and end date are required' });
     }
     
+    const parsedPage = page ? parseInt(page as string, 10) : 1;
+    const parsedPageSize = pageSize ? parseInt(pageSize as string, 10) : 100;
+    
+    const transactions = await getPuzzleTransactions(
+      userId, 
+      startDate as string, 
+      endDate as string,
+      parsedPage,
+      parsedPageSize
+    );
+    
+    return res.json(transactions);
+  } catch (error) {
+    console.error('Error getting Puzzle.io transactions:', error);
+    return res.status(500).json({ error: 'Failed to get transactions from Puzzle.io' });
+  }
+});
+
+/**
+ * Get financial report from Puzzle.io
+ */
+puzzleRouter.get('/reports/:userId/:reportType', async (req: Request, res: Response) => {
+  try {
+    const userId = parseInt(req.params.userId, 10);
+    const { reportType } = req.params;
+    const { startDate, endDate, period } = req.query;
+    
+    if (isNaN(userId)) {
+      return res.status(400).json({ error: 'Invalid user ID' });
+    }
+    
+    if (!reportType || !['balance_sheet', 'income_statement', 'cash_flow'].includes(reportType)) {
+      return res.status(400).json({ 
+        error: 'Valid report type is required (balance_sheet, income_statement, or cash_flow)' 
+      });
+    }
+    
+    if (!startDate || !endDate) {
+      return res.status(400).json({ error: 'Start date and end date are required' });
+    }
+    
+    const validPeriods = ['month', 'quarter', 'year'];
+    const periodValue = period && validPeriods.includes(period as string) 
+      ? period as 'month' | 'quarter' | 'year' 
+      : 'month';
+    
     const report = await getPuzzleFinancialReport(
       userId, 
-      reportType, 
+      reportType as 'balance_sheet' | 'income_statement' | 'cash_flow', 
       startDate as string, 
-      endDate as string
+      endDate as string,
+      periodValue
     );
     
     return res.json(report);
