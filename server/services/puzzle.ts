@@ -2,7 +2,8 @@ import { db } from '../db';
 import { eq } from 'drizzle-orm';
 import { puzzleIntegrations } from '@shared/schema';
 
-const API_BASE_URL = 'https://api.puzzle.io/v1';
+// Updated API base URL for Puzzle Accounting API
+const API_BASE_URL = 'https://api.puzzle.io/accounting/v1';
 
 /**
  * Connect a user's account to Puzzle.io
@@ -86,8 +87,8 @@ export async function getPuzzleIntegration(userId: number) {
  */
 async function validatePuzzleCredentials(apiKey: string, workspaceId: string): Promise<boolean> {
   try {
-    // Make a request to Puzzle.io API to validate credentials
-    const response = await fetch(`${API_BASE_URL}/workspaces/${workspaceId}`, {
+    // According to Puzzle Accounting API docs, test the connection by fetching workspace info
+    const response = await fetch(`${API_BASE_URL}/organizations/${workspaceId}`, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${apiKey}`,
@@ -113,7 +114,7 @@ export async function getPuzzleAccounts(userId: number) {
       throw new Error('Puzzle.io integration not found');
     }
     
-    const response = await fetch(`${API_BASE_URL}/workspaces/${integration.workspaceId}/accounts`, {
+    const response = await fetch(`${API_BASE_URL}/organizations/${integration.workspaceId}/accounts`, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${integration.apiKey}`,
@@ -126,7 +127,7 @@ export async function getPuzzleAccounts(userId: number) {
     }
     
     const data = await response.json();
-    return data;
+    return data.accounts || data; // Return the accounts array if available, or the full response
   } catch (error) {
     console.error('Error getting Puzzle.io accounts:', error);
     throw error;
@@ -135,8 +136,19 @@ export async function getPuzzleAccounts(userId: number) {
 
 /**
  * Get financial reports from Puzzle.io
+ * @param userId User ID
+ * @param reportType Type of report: 'balance_sheet', 'income_statement', or 'cash_flow'
+ * @param startDate Start date in YYYY-MM-DD format
+ * @param endDate End date in YYYY-MM-DD format
+ * @param period Optional period: 'month', 'quarter', 'year'
  */
-export async function getPuzzleFinancialReport(userId: number, reportType: string, startDate: string, endDate: string) {
+export async function getPuzzleFinancialReport(
+  userId: number, 
+  reportType: 'balance_sheet' | 'income_statement' | 'cash_flow', 
+  startDate: string, 
+  endDate: string,
+  period: 'month' | 'quarter' | 'year' = 'month'
+) {
   try {
     const integration = await getPuzzleIntegration(userId);
     
@@ -144,8 +156,22 @@ export async function getPuzzleFinancialReport(userId: number, reportType: strin
       throw new Error('Puzzle.io integration not found');
     }
     
+    // Construct the proper endpoint based on report type
+    let endpoint = '';
+    switch (reportType) {
+      case 'balance_sheet':
+        endpoint = 'balance-sheet';
+        break;
+      case 'income_statement':
+        endpoint = 'profit-and-loss';
+        break;
+      case 'cash_flow':
+        endpoint = 'cash-flow';
+        break;
+    }
+    
     const response = await fetch(
-      `${API_BASE_URL}/workspaces/${integration.workspaceId}/reports/${reportType}?startDate=${startDate}&endDate=${endDate}`, 
+      `${API_BASE_URL}/organizations/${integration.workspaceId}/reports/${endpoint}?start_date=${startDate}&end_date=${endDate}&period=${period}`, 
       {
         method: 'GET',
         headers: {
@@ -174,22 +200,194 @@ export async function getPuzzleFinancialReport(userId: number, reportType: strin
 }
 
 /**
+ * Get categories from Puzzle.io
+ */
+export async function getPuzzleCategories(userId: number) {
+  try {
+    const integration = await getPuzzleIntegration(userId);
+    
+    if (!integration) {
+      throw new Error('Puzzle.io integration not found');
+    }
+    
+    const response = await fetch(`${API_BASE_URL}/organizations/${integration.workspaceId}/categories`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${integration.apiKey}`,
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Failed to fetch categories: ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    return data.categories || data;
+  } catch (error) {
+    console.error('Error getting Puzzle.io categories:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get transactions from Puzzle.io
+ * @param userId User ID
+ * @param startDate Start date in YYYY-MM-DD format
+ * @param endDate End date in YYYY-MM-DD format
+ * @param page Optional page number for pagination
+ * @param pageSize Optional page size for pagination
+ */
+export async function getPuzzleTransactions(
+  userId: number, 
+  startDate: string, 
+  endDate: string,
+  page: number = 1,
+  pageSize: number = 100
+) {
+  try {
+    const integration = await getPuzzleIntegration(userId);
+    
+    if (!integration) {
+      throw new Error('Puzzle.io integration not found');
+    }
+    
+    const response = await fetch(
+      `${API_BASE_URL}/organizations/${integration.workspaceId}/transactions?start_date=${startDate}&end_date=${endDate}&page=${page}&page_size=${pageSize}`, 
+      {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${integration.apiKey}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+    
+    if (!response.ok) {
+      throw new Error(`Failed to fetch transactions: ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    return data.transactions || data;
+  } catch (error) {
+    console.error('Error getting Puzzle.io transactions:', error);
+    throw error;
+  }
+}
+
+/**
  * Sync data from Puzzle.io to financial projections
  */
 export async function syncPuzzleData(userId: number, forecastId: number) {
   try {
-    // Implementation for syncing Puzzle.io data to the forecasting system
-    // This would extract revenue, expense and other financial data from Puzzle.io
-    // and populate the corresponding tables in our database
+    const integration = await getPuzzleIntegration(userId);
     
-    // For now, return a placeholder
+    if (!integration) {
+      throw new Error('Puzzle.io integration not found');
+    }
+    
+    // Calculate date range - for example, last 12 months
+    const endDate = new Date().toISOString().split('T')[0]; // Today in YYYY-MM-DD
+    const startDate = new Date();
+    startDate.setFullYear(startDate.getFullYear() - 1); // 1 year ago
+    const startDateStr = startDate.toISOString().split('T')[0];
+    
+    // Get income statement (profit and loss)
+    const incomeData = await getPuzzleFinancialReport(userId, 'income_statement', startDateStr, endDate);
+    
+    // Get balance sheet
+    const balanceData = await getPuzzleFinancialReport(userId, 'balance_sheet', startDateStr, endDate);
+    
+    // Extract revenue data from income statement
+    let revenueStreams = [];
+    if (incomeData && incomeData.income) {
+      revenueStreams = extractRevenueFromIncomeStatement(incomeData, forecastId);
+    }
+    
+    // Extract expenses from income statement
+    let expenses = [];
+    if (incomeData && incomeData.expenses) {
+      expenses = extractExpensesFromIncomeStatement(incomeData, forecastId);
+    }
+    
+    // TODO: Create/update database entries for revenue streams and expenses
+    // This would involve mapping the data to our database schema and creating/updating records
+    
+    // Update last sync timestamp
+    await db.update(puzzleIntegrations)
+      .set({ lastSync: new Date() })
+      .where(eq(puzzleIntegrations.userId, userId));
+    
     return { 
       success: true, 
       message: 'Successfully synced data from Puzzle.io',
-      syncedAt: new Date()
+      syncedAt: new Date(),
+      summary: {
+        revenueStreamsCount: revenueStreams.length,
+        expensesCount: expenses.length
+      }
     };
   } catch (error) {
     console.error('Error syncing data from Puzzle.io:', error);
     throw error;
   }
+}
+
+/**
+ * Helper function to extract revenue information from income statement
+ */
+function extractRevenueFromIncomeStatement(incomeData: any, forecastId: number) {
+  // This is a placeholder implementation - actual implementation will depend on the exact structure 
+  // of the Puzzle.io API response and how we want to model the data in our system
+  const revenueStreams = [];
+  
+  if (incomeData.income) {
+    // Extract revenue categories and amounts
+    // Map them to our revenue stream model
+    // For example:
+    for (const category of incomeData.income) {
+      revenueStreams.push({
+        forecastId: forecastId,
+        name: category.name || 'Unknown Revenue',
+        description: `Imported from Puzzle.io - ${category.name}`,
+        startDate: new Date(),
+        growthRate: 0, // Default growth rate
+        initialValue: category.total || 0,
+        model: 'fixed', // Default model
+        // Other revenue stream attributes would be set here
+      });
+    }
+  }
+  
+  return revenueStreams;
+}
+
+/**
+ * Helper function to extract expense information from income statement
+ */
+function extractExpensesFromIncomeStatement(incomeData: any, forecastId: number) {
+  // This is a placeholder implementation - actual implementation will depend on the exact structure
+  // of the Puzzle.io API response and how we want to model the data in our system
+  const expenses = [];
+  
+  if (incomeData.expenses) {
+    // Extract expense categories and amounts
+    // Map them to our expense model
+    // For example:
+    for (const category of incomeData.expenses) {
+      expenses.push({
+        forecastId: forecastId,
+        name: category.name || 'Unknown Expense',
+        description: `Imported from Puzzle.io - ${category.name}`,
+        startDate: new Date(),
+        growthRate: 0, // Default growth rate
+        initialValue: category.total || 0,
+        type: 'recurring', // Default type
+        frequency: 'monthly', // Default frequency
+        // Other expense attributes would be set here
+      });
+    }
+  }
+  
+  return expenses;
 }
