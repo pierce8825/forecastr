@@ -1,52 +1,270 @@
-
+import { useState } from "react";
 import { Helmet } from "react-helmet";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { PersonnelRoles } from "@/components/dashboard/personnel-roles";
-import { PaystubGenerator } from "@/components/dashboard/paystub-generator";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle
+} from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
+} from "@/components/ui/table";
+import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Calendar, Plus, Download, Filter, Search } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 
 const Payroll = () => {
+  const [activeTab, setActiveTab] = useState("upcoming");
+
+  // Sample payroll data
+  const upcomingPayrolls = [
+    {
+      id: 1,
+      name: "Biweekly Payroll",
+      date: "May 15, 2025",
+      employees: 24,
+      status: "Scheduled",
+      amount: "$42,780.00"
+    },
+    {
+      id: 2,
+      name: "Monthly Bonus",
+      date: "May 30, 2025",
+      employees: 8,
+      status: "Pending",
+      amount: "$16,500.00"
+    },
+    {
+      id: 3,
+      name: "Contractor Payments",
+      date: "May 20, 2025",
+      employees: 5,
+      status: "Scheduled",
+      amount: "$12,450.00"
+    }
+  ];
+
+  const payrollHistory = [
+    {
+      id: 4,
+      name: "Biweekly Payroll",
+      date: "April 30, 2025",
+      employees: 24,
+      status: "Completed",
+      amount: "$42,780.00"
+    },
+    {
+      id: 5,
+      name: "Monthly Bonus",
+      date: "April 15, 2025",
+      employees: 7,
+      status: "Completed",
+      amount: "$14,000.00"
+    },
+    {
+      id: 6,
+      name: "Contractor Payments",
+      date: "April 20, 2025",
+      employees: 5,
+      status: "Completed",
+      amount: "$11,200.00"
+    },
+    {
+      id: 7,
+      name: "Biweekly Payroll",
+      date: "April 15, 2025",
+      employees: 23,
+      status: "Completed",
+      amount: "$41,500.00"
+    }
+  ];
+
+  // Function to get status badge color
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case "Scheduled":
+        return <Badge variant="outline" className="bg-blue-50 text-blue-600 hover:bg-blue-50">Scheduled</Badge>;
+      case "Pending":
+        return <Badge variant="outline" className="bg-yellow-50 text-yellow-600 hover:bg-yellow-50">Pending</Badge>;
+      case "Completed":
+        return <Badge variant="outline" className="bg-green-50 text-green-600 hover:bg-green-50">Completed</Badge>;
+      default:
+        return <Badge variant="outline">{status}</Badge>;
+    }
+  };
+
   return (
     <>
       <Helmet>
-        <title>Payroll | FinanceForge</title>
-        <meta name="description" content="Manage payroll and generate paystubs" />
+        <title>Payroll Management | FinanceForge</title>
+        <meta name="description" content="Manage and process payroll for your company" />
       </Helmet>
-      
+
       <div className="p-6">
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold">Payroll Management</h1>
-          <p className="text-muted-foreground">Generate paystubs and manage payroll</p>
+        <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="text-2xl font-bold">Payroll Management</h1>
+            <p className="text-muted-foreground">Process and manage employee payroll</p>
+          </div>
+          <div className="mt-4 flex space-x-3 sm:mt-0">
+            <Button>
+              <Plus className="mr-2 h-4 w-4" />
+              New Payroll Run
+            </Button>
+          </div>
         </div>
-        
-        <Tabs defaultValue="overview">
-          <TabsList>
-            <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="paystubs">Paystubs</TabsTrigger>
-          </TabsList>
-          
-          <TabsContent value="overview">
-            <Card>
-              <CardHeader>
-                <CardTitle>Payroll Overview</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <PersonnelRoles forecastId={1} isLoading={false} />
-              </CardContent>
-            </Card>
-          </TabsContent>
-          
-          <TabsContent value="paystubs">
-            <Card>
-              <CardHeader>
-                <CardTitle>Generate Paystubs</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <PersonnelRoles forecastId={1} isLoading={false} />
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
+
+        <div className="mb-6 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium">Total Monthly Payroll</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">$138,950.00</div>
+              <p className="text-xs text-muted-foreground mt-1">For May 2025</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium">Upcoming Payments</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">$71,730.00</div>
+              <p className="text-xs text-muted-foreground mt-1">Next 30 days</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium">Active Employees</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">32</div>
+              <p className="text-xs text-muted-foreground mt-1">+3 from last month</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium">Avg. Salary</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">$5,840</div>
+              <p className="text-xs text-muted-foreground mt-1">Per employee monthly</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        <Card className="mt-6">
+          <CardHeader>
+            <div className="flex flex-col space-y-3 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
+              <div>
+                <CardTitle>Payroll Schedules</CardTitle>
+                <CardDescription>Manage upcoming and past payroll runs</CardDescription>
+              </div>
+              <div className="flex space-x-2">
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
+                  <Input
+                    type="search"
+                    placeholder="Search..."
+                    className="pl-8 sm:w-[200px] md:w-[300px]"
+                  />
+                </div>
+                <Button variant="outline" size="icon">
+                  <Filter className="h-4 w-4" />
+                </Button>
+                <Button variant="outline" size="icon">
+                  <Calendar className="h-4 w-4" />
+                </Button>
+                <Button variant="outline" size="icon">
+                  <Download className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <Tabs defaultValue="upcoming" onValueChange={setActiveTab}>
+              <TabsList className="mb-4">
+                <TabsTrigger value="upcoming">Upcoming</TabsTrigger>
+                <TabsTrigger value="history">History</TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="upcoming">
+                <div className="rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Name</TableHead>
+                        <TableHead>Date</TableHead>
+                        <TableHead>Employees</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead className="text-right">Amount</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {upcomingPayrolls.map((payroll) => (
+                        <TableRow key={payroll.id}>
+                          <TableCell className="font-medium">{payroll.name}</TableCell>
+                          <TableCell>{payroll.date}</TableCell>
+                          <TableCell>{payroll.employees}</TableCell>
+                          <TableCell>{getStatusBadge(payroll.status)}</TableCell>
+                          <TableCell className="text-right">{payroll.amount}</TableCell>
+                          <TableCell className="text-right">
+                            <Button variant="ghost" size="sm">View</Button>
+                            <Button variant="ghost" size="sm" className="ml-2">Edit</Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </TabsContent>
+              
+              <TabsContent value="history">
+                <div className="rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Name</TableHead>
+                        <TableHead>Date</TableHead>
+                        <TableHead>Employees</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead className="text-right">Amount</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {payrollHistory.map((payroll) => (
+                        <TableRow key={payroll.id}>
+                          <TableCell className="font-medium">{payroll.name}</TableCell>
+                          <TableCell>{payroll.date}</TableCell>
+                          <TableCell>{payroll.employees}</TableCell>
+                          <TableCell>{getStatusBadge(payroll.status)}</TableCell>
+                          <TableCell className="text-right">{payroll.amount}</TableCell>
+                          <TableCell className="text-right">
+                            <Button variant="ghost" size="sm">View</Button>
+                            <Button variant="ghost" size="sm" className="ml-2">Download</Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </TabsContent>
+            </Tabs>
+          </CardContent>
+        </Card>
       </div>
     </>
   );

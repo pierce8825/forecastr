@@ -13,6 +13,7 @@ import Projections from "@/pages/projections";
 import Scenarios from "@/pages/scenarios";
 import Reports from "@/pages/reports";
 import Settings from "@/pages/settings";
+import Payroll from "@/pages/payroll";
 import NotFound from "@/pages/not-found";
 
 // Main layout component
@@ -30,6 +31,7 @@ function App() {
           <Route path="/cash-flow" component={CashFlow} />
           <Route path="/projections" component={Projections} />
           <Route path="/scenarios" component={Scenarios} />
+          <Route path="/payroll" component={Payroll} />
           <Route path="/reports" component={Reports} />
           <Route path="/settings" component={Settings} />
           <Route component={NotFound} />

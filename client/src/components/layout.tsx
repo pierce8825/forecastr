@@ -12,6 +12,7 @@ import {
   FileText,
   Settings,
   Menu,
+  Banknote,
 } from "lucide-react";
 
 import { Toaster } from "@/components/ui/toaster";
@@ -56,7 +57,7 @@ export function Layout({ children }: LayoutProps) {
 
   const navItems = [
     {
-      href: "/dashboard",
+      href: "/",
       label: "Dashboard",
       icon: <Gauge className="h-4 w-4" />,
     },
@@ -74,6 +75,11 @@ export function Layout({ children }: LayoutProps) {
       href: "/personnel",
       label: "Personnel",
       icon: <Users className="h-4 w-4" />,
+    },
+    {
+      href: "/payroll",
+      label: "Payroll",
+      icon: <Banknote className="h-4 w-4" />,
     },
     {
       href: "/cash-flow",
