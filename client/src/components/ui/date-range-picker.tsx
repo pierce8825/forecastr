@@ -267,14 +267,22 @@ export function DateRangePresetPicker({
       if (p.value === "custom") return false;
       const range = p.range;
       if (!range || !range.from || !range.to) return false;
+      if (!dateRange || !dateRange.from || !dateRange.to) return false;
       
-      const fromDate = range.from as Date;
-      const toDate = range.to as Date;
-      
-      return (
-        format(fromDate, "yyyy-MM-dd") === format(dateRange.from, "yyyy-MM-dd") &&
-        format(toDate, "yyyy-MM-dd") === format(dateRange.to, "yyyy-MM-dd")
-      );
+      try {
+        // Instead of trying to handle undefined, just force the types and catch any errors
+        const fromDate1 = range.from as Date;
+        const toDate1 = range.to as Date;
+        const fromDate2 = dateRange.from as Date;
+        const toDate2 = dateRange.to as Date;
+        
+        return (
+          format(fromDate1, "yyyy-MM-dd") === format(fromDate2, "yyyy-MM-dd") &&
+          format(toDate1, "yyyy-MM-dd") === format(toDate2, "yyyy-MM-dd")
+        );
+      } catch (error) {
+        return false;
+      }
     });
     
     return preset?.value || "custom";
