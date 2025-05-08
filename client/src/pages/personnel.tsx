@@ -1,7 +1,14 @@
+import { useState } from "react";
 import { Helmet } from "react-helmet";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { PersonnelRoles } from "@/components/dashboard/personnel-roles";
+import { Departments } from "@/components/dashboard/departments";
 
 const Personnel = () => {
+  const [activeTab, setActiveTab] = useState("overview");
+  const [selectedForecastId, setSelectedForecastId] = useState<number | undefined>(1); // Default to first forecast
+
   return (
     <>
       <Helmet>
@@ -15,18 +22,37 @@ const Personnel = () => {
           <p className="text-muted-foreground">Manage your team and associated costs</p>
         </div>
         
-        <div className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Personnel Overview</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="h-[300px] flex items-center justify-center bg-muted/20 rounded-md">
-                <p className="text-muted-foreground">Personnel management interface will be displayed here</p>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+        <Tabs defaultValue="overview" value={activeTab} onValueChange={setActiveTab}>
+          <div className="mb-6">
+            <TabsList>
+              <TabsTrigger value="overview">Overview</TabsTrigger>
+              <TabsTrigger value="departments">Departments</TabsTrigger>
+              <TabsTrigger value="roles">Roles</TabsTrigger>
+            </TabsList>
+          </div>
+          
+          <TabsContent value="overview">
+            <Card>
+              <CardHeader>
+                <CardTitle>Personnel Overview</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid gap-6 md:grid-cols-2">
+                  <Departments forecastId={selectedForecastId} isLoading={false} />
+                  <PersonnelRoles forecastId={selectedForecastId} isLoading={false} />
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+          
+          <TabsContent value="departments">
+            <Departments forecastId={selectedForecastId} isLoading={false} />
+          </TabsContent>
+          
+          <TabsContent value="roles">
+            <PersonnelRoles forecastId={selectedForecastId} isLoading={false} />
+          </TabsContent>
+        </Tabs>
       </div>
     </>
   );
