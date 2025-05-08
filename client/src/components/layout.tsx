@@ -155,12 +155,14 @@ export function Layout({ children }: LayoutProps) {
         {/* Mobile Header */}
         <header className="border-b bg-card p-4 md:hidden">
           <div className="flex items-center justify-between">
-            <SheetTrigger asChild>
-              <Button variant="ghost" size="icon">
-                <Menu className="h-5 w-5" />
-                <span className="sr-only">Toggle menu</span>
-              </Button>
-            </SheetTrigger>
+            <Button 
+              variant="ghost" 
+              size="icon"
+              onClick={() => setIsMobileMenuOpen(true)}
+            >
+              <Menu className="h-5 w-5" />
+              <span className="sr-only">Toggle menu</span>
+            </Button>
             <h1 className="text-lg font-bold tracking-tighter text-primary">
               FinanceForecast
             </h1>
