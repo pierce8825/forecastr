@@ -1,6 +1,7 @@
 import { Route, Switch } from "wouter";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
+import { Toaster } from "@/components/ui/toaster";
 
 // Import pages
 import Dashboard from "@/pages/dashboard";
@@ -15,7 +16,7 @@ import Settings from "@/pages/settings";
 import NotFound from "@/pages/not-found";
 
 // Main layout component
-import Layout from "@/components/layout";
+import { Layout } from "@/components/layout";
 
 function App() {
   return (
@@ -34,6 +35,7 @@ function App() {
           <Route component={NotFound} />
         </Switch>
       </Layout>
+      <Toaster />
     </QueryClientProvider>
   );
 }

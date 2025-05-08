@@ -1,115 +1,121 @@
-import { ReactNode } from "react";
 import { Link, useLocation } from "wouter";
-import { cn } from "@/lib/utils";
-import {
-  LayoutDashboard,
+import { 
+  BarChart3, 
   TrendingUp, 
+  DollarSign, 
+  Users, 
+  FileText, 
+  Settings, 
   CreditCard,
-  Users,
-  LineChart,
-  CandlestickChart,
-  FileBarChart,
-  Settings,
-  LogOut
+  AreaChart,
+  Layers
 } from "lucide-react";
+import { cn } from "@/lib/utils";
 
-type SidebarNavProps = {
-  children: ReactNode;
-};
+interface LayoutProps {
+  children: React.ReactNode;
+}
 
-export default function Layout({ children }: SidebarNavProps) {
+export function Layout({ children }: LayoutProps) {
   const [location] = useLocation();
 
-  const navItems = [
-    {
-      title: "Dashboard",
-      href: "/",
-      icon: LayoutDashboard,
-      exact: true
-    },
-    {
-      title: "Revenue",
-      href: "/revenue",
-      icon: TrendingUp
-    },
-    {
-      title: "Expenses",
-      href: "/expenses",
-      icon: CreditCard
-    },
-    {
-      title: "Personnel",
-      href: "/personnel",
-      icon: Users
-    },
-    {
-      title: "Cash Flow",
-      href: "/cash-flow",
-      icon: LineChart
-    },
-    {
-      title: "Projections",
-      href: "/projections",
-      icon: CandlestickChart
-    },
-    {
-      title: "Scenarios",
-      href: "/scenarios",
-      icon: LineChart
-    },
-    {
-      title: "Reports",
-      href: "/reports",
-      icon: FileBarChart
-    },
-    {
-      title: "Settings",
-      href: "/settings",
-      icon: Settings
-    }
+  const navigation = [
+    { name: "Dashboard", href: "/", icon: BarChart3 },
+    { name: "Revenue", href: "/revenue", icon: TrendingUp },
+    { name: "Expenses", href: "/expenses", icon: CreditCard },
+    { name: "Personnel", href: "/personnel", icon: Users },
+    { name: "Cash Flow", href: "/cash-flow", icon: DollarSign },
+    { name: "Projections", href: "/projections", icon: AreaChart },
+    { name: "Scenarios", href: "/scenarios", icon: Layers },
+    { name: "Reports", href: "/reports", icon: FileText },
+    { name: "Settings", href: "/settings", icon: Settings },
   ];
 
   return (
-    <div className="flex min-h-screen">
-      {/* Sidebar */}
-      <div className="fixed left-0 top-0 z-20 flex h-full w-64 flex-col border-r bg-background">
-        <div className="flex h-14 items-center border-b px-4">
-          <div className="flex items-center gap-2">
-            <span className="text-xl font-bold bg-gradient-to-r from-indigo-400 to-cyan-400 bg-clip-text text-transparent">
-              FinanceForge
-            </span>
+    <div className="min-h-screen bg-background">
+      <div className="flex h-screen overflow-hidden">
+        {/* Sidebar */}
+        <div className="hidden md:flex md:w-64 md:flex-col">
+          <div className="flex flex-col flex-grow border-r border-border bg-card pt-5">
+            <div className="flex items-center flex-shrink-0 px-4">
+              <h1 className="text-xl font-bold text-foreground bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
+                FinancialForecast
+              </h1>
+            </div>
+            <div className="mt-5 flex-grow flex flex-col">
+              <nav className="flex-1 px-2 pb-4 space-y-1">
+                {navigation.map((item) => (
+                  <Link
+                    key={item.name}
+                    href={item.href}
+                    className={cn(
+                      item.href === location
+                        ? "bg-primary/10 text-primary"
+                        : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                      "group flex items-center px-2 py-2 text-sm font-medium rounded-md"
+                    )}
+                  >
+                    <item.icon
+                      className={cn(
+                        item.href === location
+                          ? "text-primary"
+                          : "text-muted-foreground group-hover:text-foreground",
+                        "mr-3 flex-shrink-0 h-5 w-5"
+                      )}
+                      aria-hidden="true"
+                    />
+                    {item.name}
+                  </Link>
+                ))}
+              </nav>
+            </div>
           </div>
         </div>
-        <div className="flex-1 overflow-auto py-2">
-          <nav className="grid items-start px-2 text-sm">
-            {navItems.map((item, index) => (
-              <Link
-                key={index}
-                href={item.href}
-                className={cn(
-                  "flex items-center gap-3 rounded-lg px-3 py-2 transition-all hover:text-primary",
-                  (item.exact ? location === item.href : location.startsWith(item.href))
-                    ? "bg-muted font-medium text-primary"
-                    : "text-muted-foreground"
-                )}
-              >
-                <item.icon className="h-4 w-4" />
-                {item.title}
-              </Link>
-            ))}
-          </nav>
+
+        {/* Mobile header */}
+        <div className="flex flex-col flex-1 overflow-hidden">
+          <div className="md:hidden pl-1 pt-1 sm:pl-3 sm:pt-3 bg-card border-b border-border">
+            <div className="-ml-0.5 -mt-0.5 h-12 flex items-center">
+              <h1 className="ml-3 text-xl font-bold text-foreground bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
+                FinancialForecast
+              </h1>
+            </div>
+            <div className="mt-2 flex justify-start space-x-4 overflow-x-auto pb-2">
+              {navigation.map((item) => (
+                <Link
+                  key={item.name}
+                  href={item.href}
+                  className={cn(
+                    item.href === location
+                      ? "text-primary"
+                      : "text-muted-foreground hover:text-foreground",
+                    "group inline-flex items-center px-2 py-1 text-sm font-medium"
+                  )}
+                >
+                  <item.icon
+                    className={cn(
+                      item.href === location
+                        ? "text-primary"
+                        : "text-muted-foreground group-hover:text-foreground",
+                      "mr-1 flex-shrink-0 h-4 w-4"
+                    )}
+                    aria-hidden="true"
+                  />
+                  {item.name}
+                </Link>
+              ))}
+            </div>
+          </div>
+
+          {/* Main content */}
+          <main className="flex-1 relative overflow-y-auto focus:outline-none">
+            <div className="py-6">
+              <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
+                {children}
+              </div>
+            </div>
+          </main>
         </div>
-        <div className="mt-auto border-t p-4">
-          <button className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary">
-            <LogOut className="h-4 w-4" />
-            <span className="text-sm">Log Out</span>
-          </button>
-        </div>
-      </div>
-      
-      {/* Main content */}
-      <div className="flex flex-1 flex-col pl-64">
-        <main className="flex-1">{children}</main>
       </div>
     </div>
   );

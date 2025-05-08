@@ -3,13 +3,24 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatCurrency } from '@/lib/utils';
 
+interface Account {
+  id: string;
+  name: string;
+  classification: string;
+  currentBalance?: number;
+}
+
+interface AccountsData {
+  accounts: Account[];
+}
+
 interface AccountsListProps {
   className?: string;
   realmId: string;
 }
 
 export function AccountsList({ className, realmId }: AccountsListProps) {
-  const { data, isLoading, error } = useQuery({
+  const { data, isLoading, error } = useQuery<AccountsData>({
     queryKey: ['/api/quickbooks/accounts', realmId],
     enabled: !!realmId,
   });
@@ -88,7 +99,7 @@ export function AccountsList({ className, realmId }: AccountsListProps) {
 
 interface AccountSectionProps {
   title: string;
-  accounts: any[];
+  accounts: Account[];
 }
 
 function AccountSection({ title, accounts }: AccountSectionProps) {

@@ -1,7 +1,8 @@
-import { useState, useCallback } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
-import { useToast } from "./use-toast";
+import { useState, useCallback } from 'react';
+import { useQuery, useMutation } from '@tanstack/react-query';
+import { queryClient } from '@/lib/queryClient';
+import { apiRequest } from '@/lib/queryClient';
+import { useToast } from '@/hooks/use-toast';
 
 export interface QuickbooksIntegration {
   id: number;
@@ -17,20 +18,19 @@ export interface QuickbooksIntegration {
 export const useQuickbooks = (userId = 1) => {
   const [isAuthorizing, setIsAuthorizing] = useState(false);
   const { toast } = useToast();
-  const queryClient = useQueryClient();
-
-  // Fetch QuickBooks integration status
-  const { data: integration, isLoading } = useQuery<QuickbooksIntegration | null>({
+  
+  // Get integration data
+  const { data: integration, isLoading } = useQuery<QuickbooksIntegration>({
     queryKey: ['/api/quickbooks-integration', userId],
-    retry: false,
-    refetchOnWindowFocus: false
+    enabled: !!userId,
+    retry: 1
   });
 
   const isAuthorized = !!integration;
 
   // Disconnect QuickBooks integration
   const disconnectMutation = useMutation({
-    mutationFn: () => apiRequest(`/api/quickbooks-integration/${userId}`, { method: 'DELETE' }),
+    mutationFn: () => apiRequest(`/api/quickbooks-integration/${userId}`, "DELETE"),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/quickbooks-integration', userId] });
       toast({

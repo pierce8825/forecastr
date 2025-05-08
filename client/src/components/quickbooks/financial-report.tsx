@@ -7,6 +7,26 @@ import { format, subMonths } from 'date-fns';
 import { DateRangePicker } from '@/components/ui/date-range-picker';
 import { formatCurrency } from '@/lib/utils';
 
+interface ReportItem {
+  name: string;
+  amount: number;
+}
+
+interface FinancialReportData {
+  report: {
+    income?: ReportItem[];
+    expenses?: ReportItem[];
+    assets?: ReportItem[];
+    liabilities?: ReportItem[];
+    equity?: ReportItem[];
+    totalIncome?: number;
+    totalExpenses?: number;
+    totalAssets?: number;
+    totalLiabilities?: number;
+    totalEquity?: number;
+  };
+}
+
 export enum ReportType {
   PROFIT_AND_LOSS = 'PROFIT_AND_LOSS',
   BALANCE_SHEET = 'BALANCE_SHEET'
@@ -27,7 +47,7 @@ export function FinancialReport({ className, realmId, reportType }: FinancialRep
   const formattedFromDate = dateRange?.from ? format(dateRange.from, 'yyyy-MM-dd') : '';
   const formattedToDate = dateRange?.to ? format(dateRange.to, 'yyyy-MM-dd') : '';
 
-  const { data, isLoading, error } = useQuery({
+  const { data, isLoading, error } = useQuery<FinancialReportData>({
     queryKey: ['/api/quickbooks/reports', reportType, realmId, formattedFromDate, formattedToDate],
     enabled: !!realmId && !!dateRange?.from && !!dateRange?.to,
   });
