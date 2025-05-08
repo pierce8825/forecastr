@@ -278,6 +278,77 @@ export async function getProfitAndLoss(userId: number, startDate: string, endDat
 }
 
 /**
+ * Get balance sheet report from QuickBooks
+ */
+export async function getBalanceSheet(userId: number, date: string) {
+  try {
+    const qbo = await createQBClient(userId);
+    
+    return new Promise<any>((resolve, reject) => {
+      qbo.reportBalanceSheet({
+        report_date: date,
+      }, (err: Error | null, report: any) => {
+        if (err) {
+          return reject(err);
+        }
+        resolve(report);
+      });
+    });
+  } catch (error) {
+    console.error('Error getting QuickBooks balance sheet report:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get cash flow report from QuickBooks
+ */
+export async function getCashFlow(userId: number, startDate: string, endDate: string) {
+  try {
+    const qbo = await createQBClient(userId);
+    
+    return new Promise<any>((resolve, reject) => {
+      qbo.reportCashFlow({
+        start_date: startDate,
+        end_date: endDate,
+      }, (err: Error | null, report: any) => {
+        if (err) {
+          return reject(err);
+        }
+        resolve(report);
+      });
+    });
+  } catch (error) {
+    console.error('Error getting QuickBooks cash flow report:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get general ledger report from QuickBooks
+ */
+export async function getGeneralLedger(userId: number, startDate: string, endDate: string) {
+  try {
+    const qbo = await createQBClient(userId);
+    
+    return new Promise<any>((resolve, reject) => {
+      qbo.reportGeneralLedger({
+        start_date: startDate,
+        end_date: endDate,
+      }, (err: Error | null, report: any) => {
+        if (err) {
+          return reject(err);
+        }
+        resolve(report);
+      });
+    });
+  } catch (error) {
+    console.error('Error getting QuickBooks general ledger report:', error);
+    throw error;
+  }
+}
+
+/**
  * Check if a user has a valid QuickBooks integration
  */
 export async function hasValidIntegration(userId: number) {
