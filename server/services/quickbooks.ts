@@ -7,7 +7,16 @@ import { quickbooksIntegrations } from '@shared/schema';
 // QuickBooks API configuration
 const QB_CLIENT_ID = process.env.QUICKBOOKS_CLIENT_ID!;
 const QB_CLIENT_SECRET = process.env.QUICKBOOKS_CLIENT_SECRET!;
-const QB_REDIRECT_URI = process.env.QUICKBOOKS_REDIRECT_URI || 'http://localhost:5000/api/quickbooks/callback';
+
+// Determine the base URL for the application (works in both local and Replit environments)
+const getBaseUrl = () => {
+  if (process.env.REPLIT_SLUG) {
+    return `https://${process.env.REPLIT_SLUG}.${process.env.REPLIT_OWNER}.repl.co`;
+  }
+  return 'http://localhost:5000';
+};
+
+const QB_REDIRECT_URI = process.env.QUICKBOOKS_REDIRECT_URI || `${getBaseUrl()}/api/quickbooks/callback`;
 const QB_ENVIRONMENT = process.env.NODE_ENV === 'production' ? 'production' : 'sandbox';
 
 // Create OAuth client
