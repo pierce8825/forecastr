@@ -24,8 +24,7 @@ export function AccountsList({ workspaceId }: AccountsListProps) {
   const [filter, setFilter] = useState('all');
   
   const { data: accounts, isLoading, isError } = useQuery({
-    queryKey: ['/api/puzzle/accounts', USER_ID],
-    queryFn: () => apiRequest(`/api/puzzle/accounts/${USER_ID}`),
+    queryKey: [`/api/puzzle/accounts/${USER_ID}`],
     enabled: !!workspaceId,
   });
 

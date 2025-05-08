@@ -25,7 +25,7 @@ export function usePuzzle() {
   // Query to get the integration status
   const { data: integration, isLoading } = useQuery({
     queryKey: ['/api/puzzle-integration', USER_ID],
-    queryFn: async () => apiRequest(`/api/puzzle-integration/${USER_ID}`),
+    // Using the defaultQueryFn configured in queryClient.ts
     refetchOnWindowFocus: false,
   });
 
@@ -35,14 +35,15 @@ export function usePuzzle() {
   // Connect to Puzzle.io
   const connectMutation = useMutation({
     mutationFn: (data: { apiKey: string; workspaceId: string }) => {
-      return apiRequest('/api/puzzle-integration', {
-        method: 'POST',
-        data: {
+      return apiRequest(
+        '/api/puzzle-integration', 
+        'POST',
+        {
           userId: USER_ID,
           apiKey: data.apiKey,
           workspaceId: data.workspaceId,
-        },
-      });
+        }
+      );
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/puzzle-integration', USER_ID] });
@@ -66,9 +67,7 @@ export function usePuzzle() {
   // Disconnect from Puzzle.io
   const disconnectMutation = useMutation({
     mutationFn: () => {
-      return apiRequest(`/api/puzzle-integration/${USER_ID}`, {
-        method: 'DELETE',
-      });
+      return apiRequest(`/api/puzzle-integration/${USER_ID}`, 'DELETE');
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/puzzle-integration', USER_ID] });

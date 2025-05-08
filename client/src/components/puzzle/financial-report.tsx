@@ -42,8 +42,7 @@ export function FinancialReport({ workspaceId, reportType }: FinancialReportProp
   const [isExpanded, setIsExpanded] = useState(false);
 
   const { data: report, isLoading, isError } = useQuery({
-    queryKey: ['/api/puzzle/reports', USER_ID, reportType],
-    queryFn: () => apiRequest(`/api/puzzle/reports/${USER_ID}/${reportType}?startDate=2025-01-01&endDate=2025-05-01`),
+    queryKey: [`/api/puzzle/reports/${USER_ID}/${reportType}?startDate=2025-01-01&endDate=2025-05-01`],
     enabled: !!workspaceId,
   });
 
