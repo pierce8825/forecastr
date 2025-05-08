@@ -8,10 +8,10 @@ import {
   Department, InsertDepartment,
   PersonnelRole, InsertPersonnelRole,
   CustomFormula, InsertCustomFormula,
-  QuickbooksIntegration, InsertQuickbooksIntegration,
+  PuzzleIntegration, InsertPuzzleIntegration,
   FinancialProjection, InsertFinancialProjection,
   users, forecasts, revenueDrivers, revenueStreams, revenueDriverToStream,
-  expenses, departments, personnelRoles, customFormulas, quickbooksIntegrations,
+  expenses, departments, personnelRoles, customFormulas, puzzleIntegrations,
   financialProjections
 } from "@shared/schema";
 
@@ -83,12 +83,11 @@ export interface IStorage {
   updateCustomFormula(id: number, formula: Partial<InsertCustomFormula>): Promise<CustomFormula | undefined>;
   deleteCustomFormula(id: number): Promise<boolean>;
   
-  // QuickBooks Integration operations
-  getQuickbooksIntegrationByUserId(userId: number): Promise<QuickbooksIntegration | undefined>;
-  getQuickbooksIntegrationByRealmId(realmId: string): Promise<QuickbooksIntegration | undefined>;
-  createQuickbooksIntegration(integration: InsertQuickbooksIntegration): Promise<QuickbooksIntegration>;
-  updateQuickbooksIntegration(userId: number, integration: Partial<InsertQuickbooksIntegration>): Promise<QuickbooksIntegration | undefined>;
-  deleteQuickbooksIntegration(userId: number): Promise<boolean>;
+  // Puzzle.io Integration operations
+  getPuzzleIntegrationByUserId(userId: number): Promise<PuzzleIntegration | undefined>;
+  createPuzzleIntegration(integration: InsertPuzzleIntegration): Promise<PuzzleIntegration>;
+  updatePuzzleIntegration(userId: number, integration: Partial<InsertPuzzleIntegration>): Promise<PuzzleIntegration | undefined>;
+  deletePuzzleIntegration(userId: number): Promise<boolean>;
   
   // Financial Projection operations
   getFinancialProjectionsByForecastId(forecastId: number): Promise<FinancialProjection[]>;
@@ -484,44 +483,36 @@ export class DatabaseStorage implements IStorage {
     return !!deletedFormula;
   }
   
-  // QuickBooks Integration operations
-  async getQuickbooksIntegrationByUserId(userId: number): Promise<QuickbooksIntegration | undefined> {
+  // Puzzle.io Integration operations
+  async getPuzzleIntegrationByUserId(userId: number): Promise<PuzzleIntegration | undefined> {
     const [integration] = await db
       .select()
-      .from(quickbooksIntegrations)
-      .where(eq(quickbooksIntegrations.userId, userId));
-    return integration || undefined;
-  }
-  
-  async getQuickbooksIntegrationByRealmId(realmId: string): Promise<QuickbooksIntegration | undefined> {
-    const [integration] = await db
-      .select()
-      .from(quickbooksIntegrations)
-      .where(eq(quickbooksIntegrations.realmId, realmId));
+      .from(puzzleIntegrations)
+      .where(eq(puzzleIntegrations.userId, userId));
     return integration || undefined;
   }
 
-  async createQuickbooksIntegration(insertIntegration: InsertQuickbooksIntegration): Promise<QuickbooksIntegration> {
+  async createPuzzleIntegration(insertIntegration: InsertPuzzleIntegration): Promise<PuzzleIntegration> {
     const [integration] = await db
-      .insert(quickbooksIntegrations)
+      .insert(puzzleIntegrations)
       .values(insertIntegration)
       .returning();
     return integration;
   }
 
-  async updateQuickbooksIntegration(userId: number, updateData: Partial<InsertQuickbooksIntegration>): Promise<QuickbooksIntegration | undefined> {
+  async updatePuzzleIntegration(userId: number, updateData: Partial<InsertPuzzleIntegration>): Promise<PuzzleIntegration | undefined> {
     const [updatedIntegration] = await db
-      .update(quickbooksIntegrations)
+      .update(puzzleIntegrations)
       .set(updateData)
-      .where(eq(quickbooksIntegrations.userId, userId))
+      .where(eq(puzzleIntegrations.userId, userId))
       .returning();
     return updatedIntegration || undefined;
   }
 
-  async deleteQuickbooksIntegration(userId: number): Promise<boolean> {
+  async deletePuzzleIntegration(userId: number): Promise<boolean> {
     const [deletedIntegration] = await db
-      .delete(quickbooksIntegrations)
-      .where(eq(quickbooksIntegrations.userId, userId))
+      .delete(puzzleIntegrations)
+      .where(eq(puzzleIntegrations.userId, userId))
       .returning();
     return !!deletedIntegration;
   }

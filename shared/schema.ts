@@ -163,19 +163,18 @@ export const insertCustomFormulaSchema = createInsertSchema(customFormulas).omit
   updatedAt: true,
 });
 
-// QuickBooks Integration schema
-export const quickbooksIntegrations = pgTable("quickbooks_integrations", {
+// Puzzle.io Integration schema
+export const puzzleIntegrations = pgTable("puzzle_integrations", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull().unique(),
-  accessToken: text("access_token"),
-  refreshToken: text("refresh_token"),
-  realmId: text("realm_id"),
-  expiresAt: timestamp("expires_at"),
+  apiKey: text("api_key"),
+  workspaceId: text("workspace_id"),
+  lastSync: timestamp("last_sync"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
-export const insertQuickbooksIntegrationSchema = createInsertSchema(quickbooksIntegrations).omit({
+export const insertPuzzleIntegrationSchema = createInsertSchema(puzzleIntegrations).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
@@ -250,8 +249,8 @@ export type InsertPersonnelRole = z.infer<typeof insertPersonnelRoleSchema>;
 export type CustomFormula = typeof customFormulas.$inferSelect;
 export type InsertCustomFormula = z.infer<typeof insertCustomFormulaSchema>;
 
-export type QuickbooksIntegration = typeof quickbooksIntegrations.$inferSelect;
-export type InsertQuickbooksIntegration = z.infer<typeof insertQuickbooksIntegrationSchema>;
+export type PuzzleIntegration = typeof puzzleIntegrations.$inferSelect;
+export type InsertPuzzleIntegration = z.infer<typeof insertPuzzleIntegrationSchema>;
 
 export type FinancialProjection = typeof financialProjections.$inferSelect;
 export type InsertFinancialProjection = z.infer<typeof insertFinancialProjectionSchema>;

@@ -11,12 +11,12 @@ import {
   insertDepartmentSchema,
   insertPersonnelRoleSchema,
   insertCustomFormulaSchema,
-  insertQuickbooksIntegrationSchema,
+  insertPuzzleIntegrationSchema,
   insertFinancialProjectionSchema
 } from "@shared/schema";
 import { ZodError } from "zod";
 import { fromZodError } from "zod-validation-error";
-import { registerQuickbooksRoutes } from "./routes/quickbooks";
+import puzzleRouter from "./routes/puzzle";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Error handler for validation errors
@@ -625,43 +625,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
     return res.status(204).end();
   });
   
-  // QuickBooks Integration routes
-  app.get('/api/quickbooks-integration/:userId', async (req: Request, res: Response) => {
+  // Puzzle.io Integration routes
+  app.get('/api/puzzle-integration/:userId', async (req: Request, res: Response) => {
     const userId = parseInt(req.params.userId);
     if (isNaN(userId)) {
       return res.status(400).json({ message: 'Invalid user ID' });
     }
     
-    const integration = await storage.getQuickbooksIntegrationByUserId(userId);
+    const integration = await storage.getPuzzleIntegrationByUserId(userId);
     if (!integration) {
-      return res.status(404).json({ message: 'QuickBooks integration not found' });
+      return res.status(404).json({ message: 'Puzzle.io integration not found' });
     }
     
     return res.json(integration);
   });
   
-  app.post('/api/quickbooks-integration', async (req: Request, res: Response) => {
+  app.post('/api/puzzle-integration', async (req: Request, res: Response) => {
     try {
-      const integrationData = insertQuickbooksIntegrationSchema.parse(req.body);
-      const integration = await storage.createQuickbooksIntegration(integrationData);
+      const integrationData = insertPuzzleIntegrationSchema.parse(req.body);
+      const integration = await storage.createPuzzleIntegration(integrationData);
       return res.status(201).json(integration);
     } catch (err) {
       return handleValidationError(err, res);
     }
   });
   
-  app.put('/api/quickbooks-integration/:userId', async (req: Request, res: Response) => {
+  app.put('/api/puzzle-integration/:userId', async (req: Request, res: Response) => {
     try {
       const userId = parseInt(req.params.userId);
       if (isNaN(userId)) {
         return res.status(400).json({ message: 'Invalid user ID' });
       }
       
-      const integrationData = insertQuickbooksIntegrationSchema.partial().parse(req.body);
-      const updatedIntegration = await storage.updateQuickbooksIntegration(userId, integrationData);
+      const integrationData = insertPuzzleIntegrationSchema.partial().parse(req.body);
+      const updatedIntegration = await storage.updatePuzzleIntegration(userId, integrationData);
       
       if (!updatedIntegration) {
-        return res.status(404).json({ message: 'QuickBooks integration not found' });
+        return res.status(404).json({ message: 'Puzzle.io integration not found' });
       }
       
       return res.json(updatedIntegration);
@@ -670,15 +670,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  app.delete('/api/quickbooks-integration/:userId', async (req: Request, res: Response) => {
+  app.delete('/api/puzzle-integration/:userId', async (req: Request, res: Response) => {
     const userId = parseInt(req.params.userId);
     if (isNaN(userId)) {
       return res.status(400).json({ message: 'Invalid user ID' });
     }
     
-    const success = await storage.deleteQuickbooksIntegration(userId);
+    const success = await storage.deletePuzzleIntegration(userId);
     if (!success) {
-      return res.status(404).json({ message: 'QuickBooks integration not found' });
+      return res.status(404).json({ message: 'Puzzle.io integration not found' });
     }
     
     return res.status(204).end();
@@ -775,8 +775,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  // Register QuickBooks routes from separate file
-  registerQuickbooksRoutes(app);
+  // Register Puzzle.io routes
+  app.use('/api/puzzle', puzzleRouter);
 
   const httpServer = createServer(app);
   return httpServer;
