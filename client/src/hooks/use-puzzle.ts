@@ -17,6 +17,11 @@ export interface PuzzleIntegration {
   updatedAt: string;
 }
 
+// The shape of the data that will be returned from the API
+export type PuzzleIntegrationResponse = Omit<PuzzleIntegration, 'apiKey'> & {
+  success?: boolean;
+}
+
 export function usePuzzle() {
   const { toast } = useToast();
   const [isConnecting, setIsConnecting] = useState(false);

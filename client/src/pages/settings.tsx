@@ -13,6 +13,7 @@ export default function SettingsPage() {
   const [apiKey, setApiKey] = useState('');
   const [workspaceId, setWorkspaceId] = useState('');
   const { isAuthorized, isConnecting, isLoading, integration, connectPuzzle, disconnectPuzzle } = usePuzzle();
+  const puzzleIntegration = integration as PuzzleIntegrationResponse;
 
   return (
     <div className="space-y-8">
@@ -76,7 +77,9 @@ export default function SettingsPage() {
                     <div className="space-y-0.5">
                       <p className="text-sm font-medium">Connected to Puzzle.io</p>
                       <p className="text-xs text-muted-foreground">
-                        Last synced: {new Date(integration?.updatedAt || '').toLocaleString()}
+                        {puzzleIntegration?.lastSync ? 
+                          `Last synced: ${new Date(puzzleIntegration.lastSync).toLocaleString()}` : 
+                          'Not synced yet'}
                       </p>
                     </div>
                     <Button 

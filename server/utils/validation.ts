@@ -5,27 +5,15 @@ import { fromZodError } from 'zod-validation-error';
 /**
  * Handle validation errors and return appropriate response
  */
-export function handleValidationError(
-  error: unknown, 
-  res: Response, 
-  defaultMessage: string = 'Validation error'
-) {
-  console.error('Validation error:', error);
-
-  if (error instanceof ZodError) {
-    const validationError = fromZodError(error);
-    return res.status(400).json({
-      error: validationError.message
+export function handleValidationError(err: unknown, res: Response, defaultMessage: string = 'Validation error') {
+  if (err instanceof ZodError) {
+    const validationError = fromZodError(err);
+    return res.status(400).json({ 
+      message: validationError.message,
+      errors: err.errors
     });
   }
-
-  if (error instanceof Error) {
-    return res.status(500).json({
-      error: error.message || defaultMessage
-    });
-  }
-
-  return res.status(500).json({
-    error: defaultMessage
-  });
+  
+  console.error('Error:', err);
+  return res.status(500).json({ message: defaultMessage || 'Internal server error' });
 }
