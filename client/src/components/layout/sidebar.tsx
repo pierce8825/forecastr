@@ -25,6 +25,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeWorkspace, lastSynced })
     { icon: "attach_money", label: "Revenue", path: "/revenue" },
     { icon: "account_balance_wallet", label: "Expenses", path: "/expenses" },
     { icon: "people", label: "Personnel", path: "/personnel" },
+    { icon: "payments", label: "Payroll", path: "/payroll" },
     { icon: "trending_up", label: "Projections", path: "/projections" },
     { icon: "show_chart", label: "Scenarios", path: "/scenarios" },
     { icon: "assignment", label: "Reports", path: "/reports" },
