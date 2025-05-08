@@ -85,6 +85,7 @@ export interface IStorage {
   
   // QuickBooks Integration operations
   getQuickbooksIntegrationByUserId(userId: number): Promise<QuickbooksIntegration | undefined>;
+  getQuickbooksIntegrationByRealmId(realmId: string): Promise<QuickbooksIntegration | undefined>;
   createQuickbooksIntegration(integration: InsertQuickbooksIntegration): Promise<QuickbooksIntegration>;
   updateQuickbooksIntegration(userId: number, integration: Partial<InsertQuickbooksIntegration>): Promise<QuickbooksIntegration | undefined>;
   deleteQuickbooksIntegration(userId: number): Promise<boolean>;
@@ -489,6 +490,14 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(quickbooksIntegrations)
       .where(eq(quickbooksIntegrations.userId, userId));
+    return integration || undefined;
+  }
+  
+  async getQuickbooksIntegrationByRealmId(realmId: string): Promise<QuickbooksIntegration | undefined> {
+    const [integration] = await db
+      .select()
+      .from(quickbooksIntegrations)
+      .where(eq(quickbooksIntegrations.realmId, realmId));
     return integration || undefined;
   }
 
