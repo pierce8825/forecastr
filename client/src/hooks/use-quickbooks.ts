@@ -1,76 +1,79 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
+import { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
-// Types for QuickBooks integration
 interface QuickbooksIntegration {
-  id: number;
   userId: number;
-  accessToken: string | null;
-  refreshToken: string | null;
-  realmId: string | null;
-  expiresAt: string | null;
+  realmId: string;
+  accessToken: string;
+  refreshToken: string;
+  expiresAt: string;
   createdAt: string;
   updatedAt: string;
 }
 
-/**
- * Hook to manage QuickBooks integration
- */
 export function useQuickbooks(userId: number) {
+  const [isRedirecting, setIsRedirecting] = useState(false);
   const queryClient = useQueryClient();
 
-  // Get integration status
+  // Fetch integration status
   const {
     data: integration,
     isLoading,
     error,
-  } = useQuery<QuickbooksIntegration>({
-    queryKey: ["/api/quickbooks-integration", userId],
-    queryFn: async () => {
-      try {
-        const res = await fetch(`/api/quickbooks-integration/${userId}`);
-        if (res.status === 404) {
-          return null;
-        }
-        if (!res.ok) {
-          throw new Error("Failed to fetch QuickBooks integration");
-        }
-        return res.json();
-      } catch (error) {
-        console.error("Error fetching QuickBooks integration:", error);
-        return null;
-      }
-    },
+  } = useQuery<QuickbooksIntegration | null>({
+    queryKey: [`/api/quickbooks-integration/${userId}`],
+    enabled: !!userId,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    retry: false,
   });
 
-  // Connect to QuickBooks
+  // Connect mutation
   const connectMutation = useMutation({
     mutationFn: async () => {
-      // We need to redirect the user to QuickBooks for authorization
-      window.location.href = `/api/quickbooks/auth?userId=${userId}`;
+      setIsRedirecting(true);
+      const response = await fetch('/api/quickbooks/auth', {
+        method: 'GET',
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to start QuickBooks authorization');
+      }
+      
+      const { authUrl } = await response.json();
+      window.location.href = authUrl;
       return null;
     },
   });
 
-  // Disconnect from QuickBooks
+  // Disconnect mutation
   const disconnectMutation = useMutation({
     mutationFn: async () => {
-      return await apiRequest("DELETE", `/api/quickbooks-integration/${userId}`);
+      const response = await fetch(`/api/quickbooks-integration/${userId}`, {
+        method: 'DELETE',
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to disconnect QuickBooks integration');
+      }
+      
+      return true;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/quickbooks-integration"] });
+      queryClient.invalidateQueries({ queryKey: [`/api/quickbooks-integration/${userId}`] });
     },
   });
 
-  // Check if we have a valid integration
-  const isConnected = !!integration?.accessToken;
+  // Check if connected
+  const isConnected = !!integration;
 
-  // Connect handler
+  // Connect to QuickBooks
   const connectQuickbooks = async () => {
     return connectMutation.mutateAsync();
   };
 
-  // Disconnect handler
+  // Disconnect from QuickBooks
   const disconnectQuickbooks = async () => {
     return disconnectMutation.mutateAsync();
   };
@@ -83,5 +86,6 @@ export function useQuickbooks(userId: number) {
     connectQuickbooks,
     disconnectQuickbooks,
     isPending: connectMutation.isPending || disconnectMutation.isPending,
+    isRedirecting,
   };
 }

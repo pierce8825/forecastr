@@ -1,16 +1,26 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Helmet } from "react-helmet";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { CheckCircle, AlertCircle, ArrowRight } from "lucide-react";
+import { CheckCircle, AlertCircle, ArrowRight, ExternalLink } from "lucide-react";
 import { useQuickbooks } from "@/hooks/use-quickbooks";
 import { Badge } from "@/components/ui/badge";
+import { QuickbooksAccountsList } from "@/components/quickbooks/accounts-list";
+import { QuickbooksFinancialReport } from "@/components/quickbooks/financial-report";
+import { useLocation } from "wouter";
 
 const Settings = () => {
   const [activeTab, setActiveTab] = useState("account");
+  const [location] = useLocation();
   const { toast } = useToast();
+  
+  // Parse search params from location
+  const getSearchParams = () => {
+    const searchParams = new URLSearchParams(location.split('?')[1] || '');
+    return searchParams;
+  };
   
   // Demo user ID for MVP
   const userId = 1;
@@ -66,6 +76,31 @@ const Settings = () => {
       });
     }
   };
+
+  // Check for OAuth callback status
+  useEffect(() => {
+    const searchParams = getSearchParams();
+    const status = searchParams.get("status");
+    const message = searchParams.get("message");
+    const tab = searchParams.get("tab");
+    
+    if (tab === "integrations") {
+      setActiveTab("integrations");
+    }
+    
+    if (status === "success") {
+      toast({
+        title: "Connection successful",
+        description: "Successfully connected to QuickBooks Online",
+      });
+    } else if (status === "error") {
+      toast({
+        title: "Connection failed",
+        description: message || "Could not connect to QuickBooks Online",
+        variant: "destructive",
+      });
+    }
+  }, [location, toast]);
   
   return (
     <>
@@ -196,22 +231,37 @@ const Settings = () => {
                   </div>
                   
                   {isConnected && (
-                    <div className="p-4 border rounded-lg bg-muted/40">
-                      <h4 className="font-medium mb-2">Connected Account Details</h4>
-                      <div className="text-sm space-y-1">
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Company ID:</span>
-                          <span className="font-mono">{integration?.realmId || 'Unknown'}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Connected on:</span>
-                          <span>{formatDate(integration?.createdAt || new Date())}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Token expires:</span>
-                          <span>{formatDate(integration?.expiresAt || new Date())}</span>
+                    <div className="space-y-6">
+                      <div className="p-4 border rounded-lg bg-muted/40">
+                        <h4 className="font-medium mb-2">Connected Account Details</h4>
+                        <div className="text-sm space-y-1">
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Company ID:</span>
+                            <span className="font-mono">{integration?.realmId || 'Unknown'}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Connected on:</span>
+                            <span>{formatDate(integration?.createdAt || new Date())}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Token expires:</span>
+                            <span>{formatDate(integration?.expiresAt || new Date())}</span>
+                          </div>
+                          <div className="mt-3 text-right">
+                            <a 
+                              href={`https://app.qbo.intuit.com/app/homepage`} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="text-primary inline-flex items-center text-sm hover:underline"
+                            >
+                              Open QuickBooks Online <ExternalLink className="ml-1 h-3 w-3" />
+                            </a>
+                          </div>
                         </div>
                       </div>
+                      
+                      <QuickbooksAccountsList userId={userId} />
+                      <QuickbooksFinancialReport userId={userId} />
                     </div>
                   )}
                 </div>
