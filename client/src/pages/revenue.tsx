@@ -1,7 +1,14 @@
+import { useState } from "react";
 import { Helmet } from "react-helmet";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import RevenueDrivers from "@/components/dashboard/revenue-drivers";
+import { RevenueStreams } from "@/components/dashboard/revenue-streams";
 
 const Revenue = () => {
+  const [activeTab, setActiveTab] = useState("overview");
+  const [selectedForecastId, setSelectedForecastId] = useState<number | undefined>(1); // Default to first forecast
+
   return (
     <>
       <Helmet>
@@ -15,18 +22,37 @@ const Revenue = () => {
           <p className="text-muted-foreground">Manage your revenue streams and drivers</p>
         </div>
         
-        <div className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Revenue Overview</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="h-[300px] flex items-center justify-center bg-muted/20 rounded-md">
-                <p className="text-muted-foreground">Revenue management interface will be displayed here</p>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+        <Tabs defaultValue="overview" value={activeTab} onValueChange={setActiveTab}>
+          <div className="mb-6">
+            <TabsList>
+              <TabsTrigger value="overview">Overview</TabsTrigger>
+              <TabsTrigger value="drivers">Revenue Drivers</TabsTrigger>
+              <TabsTrigger value="streams">Revenue Streams</TabsTrigger>
+            </TabsList>
+          </div>
+          
+          <TabsContent value="overview">
+            <Card>
+              <CardHeader>
+                <CardTitle>Revenue Overview</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid gap-6 md:grid-cols-2">
+                  <RevenueDrivers forecastId={selectedForecastId} isLoading={false} />
+                  <RevenueStreams forecastId={selectedForecastId} isLoading={false} />
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+          
+          <TabsContent value="drivers">
+            <RevenueDrivers forecastId={selectedForecastId} isLoading={false} />
+          </TabsContent>
+          
+          <TabsContent value="streams">
+            <RevenueStreams forecastId={selectedForecastId} isLoading={false} />
+          </TabsContent>
+        </Tabs>
       </div>
     </>
   );
