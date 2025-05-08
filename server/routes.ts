@@ -12,7 +12,10 @@ import {
   insertPersonnelRoleSchema,
   insertCustomFormulaSchema,
   insertPuzzleIntegrationSchema,
-  insertFinancialProjectionSchema
+  insertFinancialProjectionSchema,
+  insertEmployeeSchema,
+  insertPayrollSchema,
+  insertPayrollItemSchema
 } from "@shared/schema";
 import { ZodError } from "zod";
 import { fromZodError } from "zod-validation-error";
@@ -748,6 +751,234 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const success = await storage.deleteFinancialProjection(projectionId);
     if (!success) {
       return res.status(404).json({ message: 'Financial projection not found' });
+    }
+    
+    return res.status(204).end();
+  });
+  
+  // Employee routes
+  app.get('/api/employees', async (req: Request, res: Response) => {
+    const userId = Number(req.query.userId);
+    if (isNaN(userId)) {
+      return res.status(400).json({ message: 'Invalid user ID' });
+    }
+    
+    const employees = await storage.getEmployeesByUserId(userId);
+    return res.json(employees);
+  });
+  
+  app.get('/api/employees/:id', async (req: Request, res: Response) => {
+    const employeeId = parseInt(req.params.id);
+    if (isNaN(employeeId)) {
+      return res.status(400).json({ message: 'Invalid employee ID' });
+    }
+    
+    const employee = await storage.getEmployee(employeeId);
+    if (!employee) {
+      return res.status(404).json({ message: 'Employee not found' });
+    }
+    
+    return res.json(employee);
+  });
+  
+  app.post('/api/employees', async (req: Request, res: Response) => {
+    try {
+      const employeeData = insertEmployeeSchema.parse(req.body);
+      
+      // Check if email exists
+      const existingEmployee = await storage.getEmployeeByEmail(employeeData.email);
+      if (existingEmployee) {
+        return res.status(400).json({ message: 'An employee with this email already exists' });
+      }
+      
+      const employee = await storage.createEmployee(employeeData);
+      return res.status(201).json(employee);
+    } catch (err) {
+      return handleValidationError(err, res);
+    }
+  });
+  
+  app.put('/api/employees/:id', async (req: Request, res: Response) => {
+    try {
+      const employeeId = parseInt(req.params.id);
+      if (isNaN(employeeId)) {
+        return res.status(400).json({ message: 'Invalid employee ID' });
+      }
+      
+      const employeeData = insertEmployeeSchema.partial().parse(req.body);
+      
+      // If email is being updated, check if it's already in use
+      if (employeeData.email) {
+        const existingEmployee = await storage.getEmployeeByEmail(employeeData.email);
+        if (existingEmployee && existingEmployee.id !== employeeId) {
+          return res.status(400).json({ message: 'Email already in use by another employee' });
+        }
+      }
+      
+      const updatedEmployee = await storage.updateEmployee(employeeId, employeeData);
+      
+      if (!updatedEmployee) {
+        return res.status(404).json({ message: 'Employee not found' });
+      }
+      
+      return res.json(updatedEmployee);
+    } catch (err) {
+      return handleValidationError(err, res);
+    }
+  });
+  
+  app.delete('/api/employees/:id', async (req: Request, res: Response) => {
+    const employeeId = parseInt(req.params.id);
+    if (isNaN(employeeId)) {
+      return res.status(400).json({ message: 'Invalid employee ID' });
+    }
+    
+    const success = await storage.deleteEmployee(employeeId);
+    if (!success) {
+      return res.status(404).json({ message: 'Employee not found' });
+    }
+    
+    return res.status(204).end();
+  });
+  
+  // Payroll routes
+  app.get('/api/payrolls', async (req: Request, res: Response) => {
+    const userId = Number(req.query.userId);
+    if (isNaN(userId)) {
+      return res.status(400).json({ message: 'Invalid user ID' });
+    }
+    
+    const payrolls = await storage.getPayrollsByUserId(userId);
+    return res.json(payrolls);
+  });
+  
+  app.get('/api/payrolls/:id', async (req: Request, res: Response) => {
+    const payrollId = parseInt(req.params.id);
+    if (isNaN(payrollId)) {
+      return res.status(400).json({ message: 'Invalid payroll ID' });
+    }
+    
+    const payroll = await storage.getPayroll(payrollId);
+    if (!payroll) {
+      return res.status(404).json({ message: 'Payroll not found' });
+    }
+    
+    return res.json(payroll);
+  });
+  
+  app.post('/api/payrolls', async (req: Request, res: Response) => {
+    try {
+      const payrollData = insertPayrollSchema.parse(req.body);
+      const payroll = await storage.createPayroll(payrollData);
+      return res.status(201).json(payroll);
+    } catch (err) {
+      return handleValidationError(err, res);
+    }
+  });
+  
+  app.put('/api/payrolls/:id', async (req: Request, res: Response) => {
+    try {
+      const payrollId = parseInt(req.params.id);
+      if (isNaN(payrollId)) {
+        return res.status(400).json({ message: 'Invalid payroll ID' });
+      }
+      
+      const payrollData = insertPayrollSchema.partial().parse(req.body);
+      const updatedPayroll = await storage.updatePayroll(payrollId, payrollData);
+      
+      if (!updatedPayroll) {
+        return res.status(404).json({ message: 'Payroll not found' });
+      }
+      
+      return res.json(updatedPayroll);
+    } catch (err) {
+      return handleValidationError(err, res);
+    }
+  });
+  
+  app.delete('/api/payrolls/:id', async (req: Request, res: Response) => {
+    const payrollId = parseInt(req.params.id);
+    if (isNaN(payrollId)) {
+      return res.status(400).json({ message: 'Invalid payroll ID' });
+    }
+    
+    const success = await storage.deletePayroll(payrollId);
+    if (!success) {
+      return res.status(404).json({ message: 'Payroll not found' });
+    }
+    
+    return res.status(204).end();
+  });
+  
+  // Payroll Item routes
+  app.get('/api/payroll-items', async (req: Request, res: Response) => {
+    const payrollId = Number(req.query.payrollId);
+    const employeeId = Number(req.query.employeeId);
+    
+    if (payrollId && !isNaN(payrollId)) {
+      const items = await storage.getPayrollItemsByPayrollId(payrollId);
+      return res.json(items);
+    } else if (employeeId && !isNaN(employeeId)) {
+      const items = await storage.getPayrollItemsByEmployeeId(employeeId);
+      return res.json(items);
+    } else {
+      return res.status(400).json({ message: 'Invalid or missing payroll ID or employee ID' });
+    }
+  });
+  
+  app.get('/api/payroll-items/:id', async (req: Request, res: Response) => {
+    const itemId = parseInt(req.params.id);
+    if (isNaN(itemId)) {
+      return res.status(400).json({ message: 'Invalid payroll item ID' });
+    }
+    
+    const item = await storage.getPayrollItem(itemId);
+    if (!item) {
+      return res.status(404).json({ message: 'Payroll item not found' });
+    }
+    
+    return res.json(item);
+  });
+  
+  app.post('/api/payroll-items', async (req: Request, res: Response) => {
+    try {
+      const itemData = insertPayrollItemSchema.parse(req.body);
+      const item = await storage.createPayrollItem(itemData);
+      return res.status(201).json(item);
+    } catch (err) {
+      return handleValidationError(err, res);
+    }
+  });
+  
+  app.put('/api/payroll-items/:id', async (req: Request, res: Response) => {
+    try {
+      const itemId = parseInt(req.params.id);
+      if (isNaN(itemId)) {
+        return res.status(400).json({ message: 'Invalid payroll item ID' });
+      }
+      
+      const itemData = insertPayrollItemSchema.partial().parse(req.body);
+      const updatedItem = await storage.updatePayrollItem(itemId, itemData);
+      
+      if (!updatedItem) {
+        return res.status(404).json({ message: 'Payroll item not found' });
+      }
+      
+      return res.json(updatedItem);
+    } catch (err) {
+      return handleValidationError(err, res);
+    }
+  });
+  
+  app.delete('/api/payroll-items/:id', async (req: Request, res: Response) => {
+    const itemId = parseInt(req.params.id);
+    if (isNaN(itemId)) {
+      return res.status(400).json({ message: 'Invalid payroll item ID' });
+    }
+    
+    const success = await storage.deletePayrollItem(itemId);
+    if (!success) {
+      return res.status(404).json({ message: 'Payroll item not found' });
     }
     
     return res.status(204).end();
