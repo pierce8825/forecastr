@@ -126,8 +126,8 @@ export function FinancialReport({ className, realmId, reportType }: FinancialRep
             <CardDescription>{formatReportDescription()}</CardDescription>
           </div>
           <DateRangePicker
-            value={dateRange}
-            onChange={setDateRange}
+            dateRange={dateRange}
+            setDateRange={setDateRange}
             align="end"
           />
         </div>

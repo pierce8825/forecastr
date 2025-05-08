@@ -1,122 +1,183 @@
+import React from "react";
 import { Link, useLocation } from "wouter";
-import { 
-  BarChart3, 
-  TrendingUp, 
-  DollarSign, 
-  Users, 
-  FileText, 
-  Settings, 
-  CreditCard,
-  AreaChart,
-  Layers
-} from "lucide-react";
 import { cn } from "@/lib/utils";
+import {
+  BarChart3,
+  TrendingUp,
+  DollarSign,
+  Users,
+  CreditCard,
+  Workflow,
+  Gauge,
+  FileText,
+  Settings,
+  Menu,
+} from "lucide-react";
 
-interface LayoutProps {
+import { Toaster } from "@/components/ui/toaster";
+import { Button } from "@/components/ui/button";
+import {
+  Sheet,
+  SheetContent,
+  SheetTrigger,
+} from "@/components/ui/sheet";
+
+export interface LayoutProps {
   children: React.ReactNode;
+}
+
+interface NavItemProps {
+  href: string;
+  label: string;
+  icon: React.ReactNode;
+  isActive: boolean;
+}
+
+function NavItem({ href, label, icon, isActive }: NavItemProps) {
+  return (
+    <Link href={href}>
+      <Button
+        variant={isActive ? "default" : "ghost"}
+        className={cn(
+          "w-full justify-start gap-2",
+          isActive ? "bg-primary text-primary-foreground" : "hover:bg-muted"
+        )}
+      >
+        {icon}
+        <span>{label}</span>
+      </Button>
+    </Link>
+  );
 }
 
 export function Layout({ children }: LayoutProps) {
   const [location] = useLocation();
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
 
-  const navigation = [
-    { name: "Dashboard", href: "/", icon: BarChart3 },
-    { name: "Revenue", href: "/revenue", icon: TrendingUp },
-    { name: "Expenses", href: "/expenses", icon: CreditCard },
-    { name: "Personnel", href: "/personnel", icon: Users },
-    { name: "Cash Flow", href: "/cash-flow", icon: DollarSign },
-    { name: "Projections", href: "/projections", icon: AreaChart },
-    { name: "Scenarios", href: "/scenarios", icon: Layers },
-    { name: "Reports", href: "/reports", icon: FileText },
-    { name: "Settings", href: "/settings", icon: Settings },
+  const navItems = [
+    {
+      href: "/dashboard",
+      label: "Dashboard",
+      icon: <Gauge className="h-4 w-4" />,
+    },
+    {
+      href: "/revenue",
+      label: "Revenue",
+      icon: <TrendingUp className="h-4 w-4" />,
+    },
+    {
+      href: "/expenses",
+      label: "Expenses",
+      icon: <CreditCard className="h-4 w-4" />,
+    },
+    {
+      href: "/personnel",
+      label: "Personnel",
+      icon: <Users className="h-4 w-4" />,
+    },
+    {
+      href: "/cash-flow",
+      label: "Cash Flow",
+      icon: <DollarSign className="h-4 w-4" />,
+    },
+    {
+      href: "/projections",
+      label: "Projections",
+      icon: <BarChart3 className="h-4 w-4" />,
+    },
+    {
+      href: "/scenarios",
+      label: "Scenarios",
+      icon: <Workflow className="h-4 w-4" />,
+    },
+    {
+      href: "/reports",
+      label: "Reports",
+      icon: <FileText className="h-4 w-4" />,
+    },
+    {
+      href: "/settings",
+      label: "Settings",
+      icon: <Settings className="h-4 w-4" />,
+    },
   ];
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="flex h-screen overflow-hidden">
-        {/* Sidebar */}
-        <div className="hidden md:flex md:w-64 md:flex-col">
-          <div className="flex flex-col flex-grow border-r border-border bg-card pt-5">
-            <div className="flex items-center flex-shrink-0 px-4">
-              <h1 className="text-xl font-bold text-foreground bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
-                FinancialForecast
-              </h1>
-            </div>
-            <div className="mt-5 flex-grow flex flex-col">
-              <nav className="flex-1 px-2 pb-4 space-y-1">
-                {navigation.map((item) => (
-                  <Link
-                    key={item.name}
-                    href={item.href}
-                    className={cn(
-                      item.href === location
-                        ? "bg-primary/10 text-primary"
-                        : "text-muted-foreground hover:bg-muted hover:text-foreground",
-                      "group flex items-center px-2 py-2 text-sm font-medium rounded-md"
-                    )}
-                  >
-                    <item.icon
-                      className={cn(
-                        item.href === location
-                          ? "text-primary"
-                          : "text-muted-foreground group-hover:text-foreground",
-                        "mr-3 flex-shrink-0 h-5 w-5"
-                      )}
-                      aria-hidden="true"
-                    />
-                    {item.name}
-                  </Link>
-                ))}
-              </nav>
-            </div>
-          </div>
+    <div className="flex min-h-screen">
+      {/* Desktop Sidebar */}
+      <div className="hidden w-64 flex-col border-r bg-card p-4 md:flex">
+        <div className="mb-6 flex items-center justify-center">
+          <h1 className="text-center text-2xl font-bold tracking-tighter text-primary">
+            FinanceForecast
+          </h1>
         </div>
-
-        {/* Mobile header */}
-        <div className="flex flex-col flex-1 overflow-hidden">
-          <div className="md:hidden pl-1 pt-1 sm:pl-3 sm:pt-3 bg-card border-b border-border">
-            <div className="-ml-0.5 -mt-0.5 h-12 flex items-center">
-              <h1 className="ml-3 text-xl font-bold text-foreground bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
-                FinancialForecast
-              </h1>
-            </div>
-            <div className="mt-2 flex justify-start space-x-4 overflow-x-auto pb-2">
-              {navigation.map((item) => (
-                <Link
-                  key={item.name}
-                  href={item.href}
-                  className={cn(
-                    item.href === location
-                      ? "text-primary"
-                      : "text-muted-foreground hover:text-foreground",
-                    "group inline-flex items-center px-2 py-1 text-sm font-medium"
-                  )}
-                >
-                  <item.icon
-                    className={cn(
-                      item.href === location
-                        ? "text-primary"
-                        : "text-muted-foreground group-hover:text-foreground",
-                      "mr-1 flex-shrink-0 h-4 w-4"
-                    )}
-                    aria-hidden="true"
-                  />
-                  {item.name}
-                </Link>
-              ))}
-            </div>
-          </div>
-
-          {/* Main content */}
-          <main className="flex-1 relative overflow-y-auto focus:outline-none">
-            <div className="py-6">
-              <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
-                {children}
-              </div>
-            </div>
-          </main>
-        </div>
+        <nav className="space-y-1">
+          {navItems.map((item) => (
+            <NavItem
+              key={item.href}
+              href={item.href}
+              label={item.label}
+              icon={item.icon}
+              isActive={location === item.href}
+            />
+          ))}
+        </nav>
       </div>
+
+      {/* Mobile Menu */}
+      <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
+        <SheetContent side="left" className="w-64 p-0">
+          <div className="flex h-full flex-col">
+            <div className="border-b p-4">
+              <h1 className="text-center text-2xl font-bold tracking-tighter text-primary">
+                FinanceForecast
+              </h1>
+            </div>
+            <nav className="flex-1 overflow-auto p-4">
+              <div className="space-y-1">
+                {navItems.map((item) => (
+                  <NavItem
+                    key={item.href}
+                    href={item.href}
+                    label={item.label}
+                    icon={item.icon}
+                    isActive={location === item.href}
+                  />
+                ))}
+              </div>
+            </nav>
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      {/* Main Content */}
+      <div className="flex flex-1 flex-col">
+        {/* Mobile Header */}
+        <header className="border-b bg-card p-4 md:hidden">
+          <div className="flex items-center justify-between">
+            <SheetTrigger asChild>
+              <Button variant="ghost" size="icon">
+                <Menu className="h-5 w-5" />
+                <span className="sr-only">Toggle menu</span>
+              </Button>
+            </SheetTrigger>
+            <h1 className="text-lg font-bold tracking-tighter text-primary">
+              FinanceForecast
+            </h1>
+            <div className="w-8" />
+          </div>
+        </header>
+
+        {/* Page Content */}
+        <main className="flex-1 overflow-auto">
+          <div className="container py-6">
+            {children}
+          </div>
+        </main>
+      </div>
+
+      {/* Toast Container */}
+      <Toaster />
     </div>
   );
 }
