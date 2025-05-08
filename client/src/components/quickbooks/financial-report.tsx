@@ -127,7 +127,7 @@ export function FinancialReport({ className, realmId, reportType }: FinancialRep
           </div>
           <DateRangePicker
             dateRange={dateRange}
-            setDateRange={setDateRange}
+            onDateRangeChange={setDateRange}
             align="end"
           />
         </div>
