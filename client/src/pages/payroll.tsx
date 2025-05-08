@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Calendar, Plus, Download, Filter, Search } from "lucide-react";
+import { Calendar, Plus, Download, Filter, Search, UserPlus, UserIcon } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 
@@ -115,9 +115,13 @@ const Payroll = () => {
             <p className="text-muted-foreground">Process and manage employee payroll</p>
           </div>
           <div className="mt-4 flex space-x-3 sm:mt-0">
-            <Button>
+            <Button onClick={() => window.alert("New payroll run initiated!")}>
               <Plus className="mr-2 h-4 w-4" />
               New Payroll Run
+            </Button>
+            <Button variant="outline" onClick={() => window.alert("Add employee dialog will open here")}>
+              <UserPlus className="mr-2 h-4 w-4" />
+              Add Employee
             </Button>
           </div>
         </div>
@@ -168,6 +172,89 @@ const Payroll = () => {
           <CardHeader>
             <div className="flex flex-col space-y-3 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
               <div>
+                <CardTitle>Employee Management</CardTitle>
+                <CardDescription>Manage employees and their information</CardDescription>
+              </div>
+              <div className="flex space-x-2">
+                <Button variant="outline" onClick={() => window.alert("Employee records will be exported")}>
+                  <Download className="mr-2 h-4 w-4" />
+                  Export
+                </Button>
+                <Button onClick={() => window.alert("Add new employee dialog will open here")}>
+                  <UserPlus className="mr-2 h-4 w-4" />
+                  Add Employee
+                </Button>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Department</TableHead>
+                    <TableHead>Role</TableHead>
+                    <TableHead>Start Date</TableHead>
+                    <TableHead className="text-right">Salary</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  <TableRow>
+                    <TableCell className="font-medium">John Smith</TableCell>
+                    <TableCell>Engineering</TableCell>
+                    <TableCell>Senior Developer</TableCell>
+                    <TableCell>Jan 15, 2023</TableCell>
+                    <TableCell className="text-right">$95,000</TableCell>
+                    <TableCell className="text-right">
+                      <Button variant="ghost" size="sm" onClick={() => window.alert("Viewing John Smith's details")}>View</Button>
+                      <Button variant="ghost" size="sm" className="ml-2" onClick={() => window.alert("Editing John Smith's information")}>Edit</Button>
+                    </TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell className="font-medium">Sarah Johnson</TableCell>
+                    <TableCell>Marketing</TableCell>
+                    <TableCell>Marketing Director</TableCell>
+                    <TableCell>Mar 3, 2022</TableCell>
+                    <TableCell className="text-right">$110,000</TableCell>
+                    <TableCell className="text-right">
+                      <Button variant="ghost" size="sm" onClick={() => window.alert("Viewing Sarah Johnson's details")}>View</Button>
+                      <Button variant="ghost" size="sm" className="ml-2" onClick={() => window.alert("Editing Sarah Johnson's information")}>Edit</Button>
+                    </TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell className="font-medium">Michael Chen</TableCell>
+                    <TableCell>Finance</TableCell>
+                    <TableCell>Financial Analyst</TableCell>
+                    <TableCell>Jul 10, 2024</TableCell>
+                    <TableCell className="text-right">$85,000</TableCell>
+                    <TableCell className="text-right">
+                      <Button variant="ghost" size="sm" onClick={() => window.alert("Viewing Michael Chen's details")}>View</Button>
+                      <Button variant="ghost" size="sm" className="ml-2" onClick={() => window.alert("Editing Michael Chen's information")}>Edit</Button>
+                    </TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell className="font-medium">Emma Rodriguez</TableCell>
+                    <TableCell>Sales</TableCell>
+                    <TableCell>Account Executive</TableCell>
+                    <TableCell>Feb 22, 2023</TableCell>
+                    <TableCell className="text-right">$78,500</TableCell>
+                    <TableCell className="text-right">
+                      <Button variant="ghost" size="sm" onClick={() => window.alert("Viewing Emma Rodriguez's details")}>View</Button>
+                      <Button variant="ghost" size="sm" className="ml-2" onClick={() => window.alert("Editing Emma Rodriguez's information")}>Edit</Button>
+                    </TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="mt-6">
+          <CardHeader>
+            <div className="flex flex-col space-y-3 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
+              <div>
                 <CardTitle>Payroll Schedules</CardTitle>
                 <CardDescription>Manage upcoming and past payroll runs</CardDescription>
               </div>
@@ -180,13 +267,13 @@ const Payroll = () => {
                     className="pl-8 sm:w-[200px] md:w-[300px]"
                   />
                 </div>
-                <Button variant="outline" size="icon">
+                <Button variant="outline" size="icon" onClick={() => window.alert("Filter options will appear here")}>
                   <Filter className="h-4 w-4" />
                 </Button>
-                <Button variant="outline" size="icon">
+                <Button variant="outline" size="icon" onClick={() => window.alert("Calendar view will open here")}>
                   <Calendar className="h-4 w-4" />
                 </Button>
-                <Button variant="outline" size="icon">
+                <Button variant="outline" size="icon" onClick={() => window.alert("Downloading payroll data...")}>
                   <Download className="h-4 w-4" />
                 </Button>
               </div>
@@ -221,8 +308,8 @@ const Payroll = () => {
                           <TableCell>{getStatusBadge(payroll.status)}</TableCell>
                           <TableCell className="text-right">{payroll.amount}</TableCell>
                           <TableCell className="text-right">
-                            <Button variant="ghost" size="sm">View</Button>
-                            <Button variant="ghost" size="sm" className="ml-2">Edit</Button>
+                            <Button variant="ghost" size="sm" onClick={() => window.alert(`Viewing details for ${payroll.name}`)}>View</Button>
+                            <Button variant="ghost" size="sm" className="ml-2" onClick={() => window.alert(`Editing ${payroll.name}`)}>Edit</Button>
                           </TableCell>
                         </TableRow>
                       ))}
@@ -253,8 +340,8 @@ const Payroll = () => {
                           <TableCell>{getStatusBadge(payroll.status)}</TableCell>
                           <TableCell className="text-right">{payroll.amount}</TableCell>
                           <TableCell className="text-right">
-                            <Button variant="ghost" size="sm">View</Button>
-                            <Button variant="ghost" size="sm" className="ml-2">Download</Button>
+                            <Button variant="ghost" size="sm" onClick={() => window.alert(`Viewing details for ${payroll.name}`)}>View</Button>
+                            <Button variant="ghost" size="sm" className="ml-2" onClick={() => window.alert(`Downloading ${payroll.name} report...`)}>Download</Button>
                           </TableCell>
                         </TableRow>
                       ))}
