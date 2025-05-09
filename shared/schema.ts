@@ -278,6 +278,29 @@ export type InsertCustomFormula = z.infer<typeof insertCustomFormulaSchema>;
 export type PuzzleIntegration = typeof puzzleIntegrations.$inferSelect;
 export type InsertPuzzleIntegration = z.infer<typeof insertPuzzleIntegrationSchema>;
 
+// Expense Budget schema
+export const expenseBudgets = pgTable("expense_budgets", {
+  id: serial("id").primaryKey(),
+  forecastId: integer("forecast_id").notNull(),
+  category: text("category").notNull(),
+  department: text("department"),
+  departmentId: integer("department_id"),
+  year: integer("year").notNull(),
+  amount: numeric("amount", { precision: 15, scale: 2 }).notNull(),
+  description: text("description"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertExpenseBudgetSchema = createInsertSchema(expenseBudgets).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type ExpenseBudget = typeof expenseBudgets.$inferSelect;
+export type InsertExpenseBudget = z.infer<typeof insertExpenseBudgetSchema>;
+
 export type FinancialProjection = typeof financialProjections.$inferSelect;
 export type InsertFinancialProjection = z.infer<typeof insertFinancialProjectionSchema>;
 

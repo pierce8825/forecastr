@@ -397,6 +397,50 @@ export class DatabaseStorage implements IStorage {
     return !!deletedMapping;
   }
   
+  // Expense Budget operations
+  async getExpenseBudgets(forecastId: number, year?: number): Promise<ExpenseBudget[]> {
+    let query = db.select().from(expenseBudgets).where(eq(expenseBudgets.forecastId, forecastId));
+    
+    if (year) {
+      query = query.where(eq(expenseBudgets.year, year));
+    }
+    
+    return query.orderBy(expenseBudgets.category);
+  }
+
+  async getExpenseBudgetById(id: number): Promise<ExpenseBudget | undefined> {
+    const [budget] = await db
+      .select()
+      .from(expenseBudgets)
+      .where(eq(expenseBudgets.id, id));
+    return budget;
+  }
+
+  async createExpenseBudget(budget: InsertExpenseBudget): Promise<ExpenseBudget> {
+    const [newBudget] = await db
+      .insert(expenseBudgets)
+      .values(budget)
+      .returning();
+    return newBudget;
+  }
+
+  async updateExpenseBudget(id: number, budgetData: Partial<InsertExpenseBudget>): Promise<ExpenseBudget | undefined> {
+    const [updatedBudget] = await db
+      .update(expenseBudgets)
+      .set(budgetData)
+      .where(eq(expenseBudgets.id, id))
+      .returning();
+    return updatedBudget || undefined;
+  }
+
+  async deleteExpenseBudget(id: number): Promise<boolean> {
+    const [deletedBudget] = await db
+      .delete(expenseBudgets)
+      .where(eq(expenseBudgets.id, id))
+      .returning();
+    return !!deletedBudget;
+  }
+  
   // Expense operations
   async getExpensesByForecastId(forecastId: number): Promise<Expense[]> {
     return await db

@@ -493,6 +493,77 @@ export async function registerRoutes(app: Express): Promise<Server> {
     return res.status(204).end();
   });
   
+  // Expense Budget routes
+  app.get('/api/expense-budgets', async (req: Request, res: Response) => {
+    const forecastId = Number(req.query.forecastId);
+    const year = req.query.year ? Number(req.query.year) : undefined;
+    
+    if (!forecastId || isNaN(forecastId)) {
+      return res.status(400).json({ message: 'Invalid or missing forecast ID' });
+    }
+    
+    const budgets = await storage.getExpenseBudgets(forecastId, year);
+    return res.json(budgets);
+  });
+  
+  app.get('/api/expense-budgets/:id', async (req: Request, res: Response) => {
+    const budgetId = parseInt(req.params.id);
+    if (isNaN(budgetId)) {
+      return res.status(400).json({ message: 'Invalid budget ID' });
+    }
+    
+    const budget = await storage.getExpenseBudgetById(budgetId);
+    if (!budget) {
+      return res.status(404).json({ message: 'Budget not found' });
+    }
+    
+    return res.json(budget);
+  });
+  
+  app.post('/api/expense-budgets', async (req: Request, res: Response) => {
+    try {
+      const budgetData = insertExpenseBudgetSchema.parse(req.body);
+      const budget = await storage.createExpenseBudget(budgetData);
+      return res.status(201).json(budget);
+    } catch (err) {
+      return handleValidationError(err, res);
+    }
+  });
+  
+  app.put('/api/expense-budgets/:id', async (req: Request, res: Response) => {
+    try {
+      const budgetId = parseInt(req.params.id);
+      if (isNaN(budgetId)) {
+        return res.status(400).json({ message: 'Invalid budget ID' });
+      }
+      
+      const budgetData = insertExpenseBudgetSchema.partial().parse(req.body);
+      const updatedBudget = await storage.updateExpenseBudget(budgetId, budgetData);
+      
+      if (!updatedBudget) {
+        return res.status(404).json({ message: 'Budget not found' });
+      }
+      
+      return res.json(updatedBudget);
+    } catch (err) {
+      return handleValidationError(err, res);
+    }
+  });
+  
+  app.delete('/api/expense-budgets/:id', async (req: Request, res: Response) => {
+    const budgetId = parseInt(req.params.id);
+    if (isNaN(budgetId)) {
+      return res.status(400).json({ message: 'Invalid budget ID' });
+    }
+    
+    const success = await storage.deleteExpenseBudget(budgetId);
+    if (!success) {
+      return res.status(404).json({ message: 'Budget not found' });
+    }
+    
+    return res.status(204).end();
+  });
+  
   // Department routes
   app.get('/api/departments', async (req: Request, res: Response) => {
     const forecastId = Number(req.query.forecastId);

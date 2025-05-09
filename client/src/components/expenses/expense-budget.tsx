@@ -44,8 +44,13 @@ export const ExpenseBudget: React.FC<ExpenseBudgetProps> = ({ forecastId }) => {
       const expenses = await res.json();
       
       // Extract unique categories
-      const uniqueCategories = [...new Set(expenses.map((e: any) => e.category))];
-      return uniqueCategories.filter(Boolean).map((cat: string) => ({
+      const categoriesMap: Record<string, boolean> = {};
+      expenses.forEach((e: any) => {
+        if (e.category) {
+          categoriesMap[e.category] = true;
+        }
+      });
+      return Object.keys(categoriesMap).map((cat: string) => ({
         name: cat
       }));
     },
@@ -287,7 +292,7 @@ export const ExpenseBudget: React.FC<ExpenseBudgetProps> = ({ forecastId }) => {
             <div className="flex justify-center items-center py-6">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
             </div>
-          ) : budgets?.length > 0 ? (
+          ) : (budgets && budgets.length > 0) ? (
             <Table>
               <TableHeader>
                 <TableRow>
@@ -299,7 +304,7 @@ export const ExpenseBudget: React.FC<ExpenseBudgetProps> = ({ forecastId }) => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {budgets.map((budget: any) => (
+                {budgets && budgets.map((budget: any) => (
                   <TableRow key={budget.id}>
                     <TableCell className="font-medium">{budget.category}</TableCell>
                     <TableCell>{budget.departmentName || '-'}</TableCell>
