@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { Helmet } from "react-helmet";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -42,12 +42,6 @@ export default function AuthPage() {
   const [_, navigate] = useLocation();
   const { user, loginMutation, registerMutation } = useAuth();
 
-  // Redirect if user is already logged in
-  if (user) {
-    navigate("/");
-    return null;
-  }
-
   // Login form handling
   const loginForm = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
@@ -56,6 +50,30 @@ export default function AuthPage() {
       password: "",
     },
   });
+
+  // Register form handling
+  const registerForm = useForm<RegisterFormValues>({
+    resolver: zodResolver(registerSchema),
+    defaultValues: {
+      email: "",
+      password: "",
+      confirmPassword: "",
+      companyName: "",
+    },
+  });
+  
+  // Redirect if user is already logged in - moved after hook definitions
+  // to ensure hooks are always called in the same order
+  useEffect(() => {
+    if (user) {
+      navigate("/");
+    }
+  }, [user, navigate]);
+  
+  // Early return after all hooks have been called
+  if (user) {
+    return null;
+  }
 
   const onLoginSubmit = (values: LoginFormValues) => {
     loginMutation.mutate(values, {
@@ -69,17 +87,6 @@ export default function AuthPage() {
       },
     });
   };
-
-  // Register form handling
-  const registerForm = useForm<RegisterFormValues>({
-    resolver: zodResolver(registerSchema),
-    defaultValues: {
-      email: "",
-      password: "",
-      confirmPassword: "",
-      companyName: "",
-    },
-  });
 
   const onRegisterSubmit = (values: RegisterFormValues) => {
     // Remove confirmPassword before submitting
