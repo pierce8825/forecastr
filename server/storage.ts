@@ -14,9 +14,10 @@ import {
   Employee, InsertEmployee,
   Payroll, InsertPayroll,
   PayrollItem, InsertPayrollItem,
+  ExpenseBudget, InsertExpenseBudget,
   users, subaccounts, forecasts, revenueDrivers, revenueStreams, revenueDriverToStream,
   expenses, departments, personnelRoles, customFormulas, puzzleIntegrations,
-  financialProjections, employees, payrolls, payrollItems
+  financialProjections, employees, payrolls, payrollItems, expenseBudgets
 } from "@shared/schema";
 
 import { db } from "./db";
@@ -132,6 +133,13 @@ export interface IStorage {
   createPayrollItem(payrollItem: InsertPayrollItem): Promise<PayrollItem>;
   updatePayrollItem(id: number, payrollItem: Partial<InsertPayrollItem>): Promise<PayrollItem | undefined>;
   deletePayrollItem(id: number): Promise<boolean>;
+  
+  // Expense Budget operations
+  getExpenseBudgets(forecastId: number, year?: number): Promise<ExpenseBudget[]>;
+  getExpenseBudgetById(id: number): Promise<ExpenseBudget | undefined>;
+  createExpenseBudget(budget: InsertExpenseBudget): Promise<ExpenseBudget>;
+  updateExpenseBudget(id: number, budget: Partial<InsertExpenseBudget>): Promise<ExpenseBudget | undefined>;
+  deleteExpenseBudget(id: number): Promise<boolean>;
 }
 
 // Use database storage implementation
@@ -399,13 +407,18 @@ export class DatabaseStorage implements IStorage {
   
   // Expense Budget operations
   async getExpenseBudgets(forecastId: number, year?: number): Promise<ExpenseBudget[]> {
-    let query = db.select().from(expenseBudgets).where(eq(expenseBudgets.forecastId, forecastId));
+    let query = db.select().from(expenseBudgets);
     
+    // Apply the base condition for forecastId
+    query = query.where(eq(expenseBudgets.forecastId, forecastId));
+    
+    // Apply additional year filter if provided
     if (year) {
       query = query.where(eq(expenseBudgets.year, year));
     }
     
-    return query.orderBy(expenseBudgets.category);
+    const results = await query.orderBy(expenseBudgets.category);
+    return results;
   }
 
   async getExpenseBudgetById(id: number): Promise<ExpenseBudget | undefined> {

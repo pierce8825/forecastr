@@ -16,7 +16,8 @@ import {
   insertFinancialProjectionSchema,
   insertEmployeeSchema,
   insertPayrollSchema,
-  insertPayrollItemSchema
+  insertPayrollItemSchema,
+  insertExpenseBudgetSchema
 } from "@shared/schema";
 import { ZodError } from "zod";
 import { fromZodError } from "zod-validation-error";
