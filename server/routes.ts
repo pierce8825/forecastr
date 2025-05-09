@@ -836,12 +836,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Employee routes
   app.get('/api/employees', async (req: Request, res: Response) => {
     const userId = Number(req.query.userId);
-    if (isNaN(userId)) {
-      return res.status(400).json({ message: 'Invalid user ID' });
-    }
+    const subaccountId = Number(req.query.subaccountId);
     
-    const employees = await storage.getEmployeesByUserId(userId);
-    return res.json(employees);
+    if (subaccountId && !isNaN(subaccountId)) {
+      // If subaccountId is provided, filter by subaccount
+      const employees = await storage.getEmployeesBySubaccountId(subaccountId);
+      return res.json(employees);
+    } else if (userId && !isNaN(userId)) {
+      // If only userId is provided, filter by user
+      const employees = await storage.getEmployeesByUserId(userId);
+      return res.json(employees);
+    } else {
+      return res.status(400).json({ message: 'Invalid or missing user ID or subaccount ID' });
+    }
   });
   
   app.get('/api/employees/:id', async (req: Request, res: Response) => {
@@ -921,12 +928,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Payroll routes
   app.get('/api/payrolls', async (req: Request, res: Response) => {
     const userId = Number(req.query.userId);
-    if (isNaN(userId)) {
-      return res.status(400).json({ message: 'Invalid user ID' });
-    }
+    const subaccountId = Number(req.query.subaccountId);
     
-    const payrolls = await storage.getPayrollsByUserId(userId);
-    return res.json(payrolls);
+    if (subaccountId && !isNaN(subaccountId)) {
+      // If subaccountId is provided, filter by subaccount
+      const payrolls = await storage.getPayrollsBySubaccountId(subaccountId);
+      return res.json(payrolls);
+    } else if (userId && !isNaN(userId)) {
+      // If only userId is provided, filter by user
+      const payrolls = await storage.getPayrollsByUserId(userId);
+      return res.json(payrolls);
+    } else {
+      return res.status(400).json({ message: 'Invalid or missing user ID or subaccount ID' });
+    }
   });
   
   app.get('/api/payrolls/:id', async (req: Request, res: Response) => {
