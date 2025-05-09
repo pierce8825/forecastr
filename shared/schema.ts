@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, jsonb, numeric, timestamp, boolean, date } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, jsonb, numeric, timestamp, boolean, date, uuid } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -12,6 +12,27 @@ export const users = pgTable("users", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// Subaccount schema for managing multiple companies/projects
+export const subaccounts = pgTable("subaccounts", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(), // The owner of the subaccount
+  name: text("name").notNull(), // Company or project name
+  description: text("description"),
+  industry: text("industry"),
+  logo: text("logo"), // URL to logo image
+  active: boolean("active").default(true),
+  customDomain: text("custom_domain"),
+  settings: jsonb("settings"), // Store custom settings as JSON
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertSubaccountSchema = createInsertSchema(subaccounts).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 export const insertUserSchema = createInsertSchema(users).omit({ 
   id: true,
   createdAt: true,
@@ -21,6 +42,7 @@ export const insertUserSchema = createInsertSchema(users).omit({
 export const forecasts = pgTable("forecasts", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull(),
+  subaccountId: integer("subaccount_id"), // Optional if using shared forecasts
   name: text("name").notNull(),
   description: text("description"),
   currency: text("currency").default("USD"),
@@ -226,6 +248,9 @@ export const insertRevenueDriverToStreamSchema = createInsertSchema(revenueDrive
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
 
+export type Subaccount = typeof subaccounts.$inferSelect;
+export type InsertSubaccount = z.infer<typeof insertSubaccountSchema>;
+
 export type Forecast = typeof forecasts.$inferSelect;
 export type InsertForecast = z.infer<typeof insertForecastSchema>;
 
@@ -260,6 +285,7 @@ export type InsertFinancialProjection = z.infer<typeof insertFinancialProjection
 export const employees = pgTable("employees", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull(),
+  subaccountId: integer("subaccount_id"), // Allow employees to be associated with specific subaccounts
   firstName: text("first_name").notNull(),
   lastName: text("last_name").notNull(),
   email: text("email").notNull(),
@@ -295,6 +321,7 @@ export type InsertEmployee = z.infer<typeof insertEmployeeSchema>;
 export const payrolls = pgTable("payrolls", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull(),
+  subaccountId: integer("subaccount_id"), // Allow payrolls to be associated with specific subaccounts
   name: text("name").notNull(),
   payPeriodStart: date("pay_period_start").notNull(),
   payPeriodEnd: date("pay_period_end").notNull(),
@@ -339,3 +366,93 @@ export const insertPayrollItemSchema = createInsertSchema(payrollItems).omit({
 
 export type PayrollItem = typeof payrollItems.$inferSelect;
 export type InsertPayrollItem = z.infer<typeof insertPayrollItemSchema>;
+
+// Define the relationships between tables
+export const relations = {
+  users: {
+    subaccounts: {
+      // One user can have many subaccounts
+      relationDef: {
+        one: {
+          table: users,
+          field: users.id,
+        },
+        many: {
+          table: subaccounts,
+          field: subaccounts.userId,
+        },
+      },
+    },
+  },
+  subaccounts: {
+    forecasts: {
+      // One subaccount can have many forecasts
+      relationDef: {
+        one: {
+          table: subaccounts,
+          field: subaccounts.id,
+        },
+        many: {
+          table: forecasts,
+          field: forecasts.subaccountId,
+        },
+      },
+    },
+    employees: {
+      // One subaccount can have many employees
+      relationDef: {
+        one: {
+          table: subaccounts,
+          field: subaccounts.id,
+        },
+        many: {
+          table: employees,
+          field: employees.subaccountId,
+        },
+      },
+    },
+    payrolls: {
+      // One subaccount can have many payrolls
+      relationDef: {
+        one: {
+          table: subaccounts,
+          field: subaccounts.id,
+        },
+        many: {
+          table: payrolls,
+          field: payrolls.subaccountId,
+        },
+      },
+    },
+  },
+  employees: {
+    payrollItems: {
+      // One employee can have many payroll items
+      relationDef: {
+        one: {
+          table: employees,
+          field: employees.id,
+        },
+        many: {
+          table: payrollItems,
+          field: payrollItems.employeeId,
+        },
+      },
+    },
+  },
+  payrolls: {
+    payrollItems: {
+      // One payroll can have many payroll items
+      relationDef: {
+        one: {
+          table: payrolls,
+          field: payrolls.id,
+        },
+        many: {
+          table: payrollItems,
+          field: payrollItems.payrollId,
+        },
+      },
+    },
+  },
+};
