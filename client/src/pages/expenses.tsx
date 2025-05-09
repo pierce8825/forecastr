@@ -27,39 +27,39 @@ const Expenses = () => {
             <TabsList>
               <TabsTrigger value="overview">Overview</TabsTrigger>
               <TabsTrigger value="categories">Expense Categories</TabsTrigger>
-              <TabsTrigger value="budgets">Budgets</TabsTrigger>
             </TabsList>
           </div>
           
           <TabsContent value="overview">
-            <Card>
-              <CardHeader>
-                <CardTitle>Expense Overview</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid gap-6 md:grid-cols-2">
-                  <ExpenseCategories forecastId={selectedForecastId} isLoading={false} />
-                  <Card>
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-base">Expense Breakdown</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="h-[300px] flex items-center justify-center bg-muted/20 rounded-md">
-                        <p className="text-muted-foreground">Expense visualization will be added here</p>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </div>
-              </CardContent>
-            </Card>
+            <div className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Expense Overview</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid gap-6 md:grid-cols-2">
+                    <ExpenseCategories forecastId={selectedForecastId} isLoading={false} />
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-base">Expense Breakdown</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="h-[300px] flex items-center justify-center bg-muted/20 rounded-md">
+                          <p className="text-muted-foreground">Expense visualization will be added here</p>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+                </CardContent>
+              </Card>
+              
+              {/* Budget Management Section */}
+              <ExpenseBudget forecastId={selectedForecastId} />
+            </div>
           </TabsContent>
           
           <TabsContent value="categories">
             <ExpenseCategories forecastId={selectedForecastId} isLoading={false} />
-          </TabsContent>
-          
-          <TabsContent value="budgets">
-            <ExpenseBudget forecastId={selectedForecastId} />
           </TabsContent>
         </Tabs>
       </div>

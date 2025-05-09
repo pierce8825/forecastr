@@ -170,7 +170,7 @@ export const ExpenseBudget: React.FC<ExpenseBudgetProps> = ({ forecastId }) => {
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>Create Expense Budget</CardTitle>
+          <CardTitle>Budget Management</CardTitle>
         </CardHeader>
         <CardContent>
           {isLoading ? (
@@ -278,7 +278,7 @@ export const ExpenseBudget: React.FC<ExpenseBudgetProps> = ({ forecastId }) => {
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between pb-2">
-          <CardTitle>Budget for {year}</CardTitle>
+          <CardTitle>Expense Budgets ({year})</CardTitle>
           <Select value={year} onValueChange={setYear}>
             <SelectTrigger className="w-[100px]">
               <Calendar className="mr-2 h-4 w-4" />
