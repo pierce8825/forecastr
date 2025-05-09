@@ -1,4 +1,4 @@
-import type { Express, Request, Response, NextFunction } from "express";
+import type { Express, Request as ExpressRequest, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { 
@@ -23,6 +23,11 @@ import { ZodError } from "zod";
 import { fromZodError } from "zod-validation-error";
 import puzzleRouter from "./routes/puzzle";
 import { setupAuth } from "./auth";
+
+// Extend Express Request to include resource property
+interface Request extends ExpressRequest {
+  resource?: any;
+}
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Set up authentication
@@ -49,6 +54,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
     return res.status(401).json({ message: 'Not authenticated' });
   };
+  
+  // Middleware to check if user owns the resource
+  const isResourceOwner = (resourceGetter: (id: number) => Promise<any>) => {
+    return async (req: Request, res: Response, next: Function) => {
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ message: 'Not authenticated' });
+      }
+      
+      const resourceId = parseInt(req.params.id);
+      if (isNaN(resourceId)) {
+        return res.status(400).json({ message: 'Invalid resource ID' });
+      }
+      
+      try {
+        const resource = await resourceGetter(resourceId);
+        if (!resource) {
+          return res.status(404).json({ message: 'Resource not found' });
+        }
+        
+        // Check if the resource belongs to the current user
+        if (resource.userId && resource.userId !== req.user.id) {
+          return res.status(403).json({ message: 'Access denied' });
+        }
+        
+        // Store the resource in the request object for later use
+        req.resource = resource;
+        next();
+      } catch (error) {
+        console.error('Error in isResourceOwner middleware:', error);
+        return res.status(500).json({ message: 'Internal server error' });
+      }
+    };
+  };
 
   // User routes
   app.post('/api/users', async (req: Request, res: Response) => {
@@ -74,10 +112,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  app.get('/api/users/:id', async (req: Request, res: Response) => {
+  app.get('/api/users/:id', isAuthenticated, async (req: Request, res: Response) => {
     const userId = parseInt(req.params.id);
     if (isNaN(userId)) {
       return res.status(400).json({ message: 'Invalid user ID' });
+    }
+    
+    // Only allow users to access their own data
+    if (userId !== req.user.id) {
+      return res.status(403).json({ message: 'Access denied' });
     }
     
     const user = await storage.getUser(userId);
@@ -91,17 +134,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Subaccount routes
-  app.get('/api/subaccounts', async (req: Request, res: Response) => {
-    const userId = Number(req.query.userId);
-    if (isNaN(userId)) {
-      return res.status(400).json({ message: 'Invalid user ID' });
+  app.get('/api/subaccounts', isAuthenticated, async (req: Request, res: Response) => {
+    // If userId isn't provided, use the authenticated user's ID
+    const userId = Number(req.query.userId) || req.user.id;
+    
+    // Ensure users can only access their own subaccounts
+    if (userId !== req.user.id) {
+      return res.status(403).json({ message: 'Access denied' });
     }
     
     const subaccounts = await storage.getSubaccountsByUserId(userId);
     return res.json(subaccounts);
   });
   
-  app.get('/api/subaccounts/:id', async (req: Request, res: Response) => {
+  app.get('/api/subaccounts/:id', isAuthenticated, async (req: Request, res: Response) => {
     const subaccountId = parseInt(req.params.id);
     if (isNaN(subaccountId)) {
       return res.status(400).json({ message: 'Invalid subaccount ID' });
@@ -112,12 +158,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(404).json({ message: 'Subaccount not found' });
     }
     
+    // Ensure users can only access their own subaccounts
+    if (subaccount.userId !== req.user.id) {
+      return res.status(403).json({ message: 'Access denied' });
+    }
+    
     return res.json(subaccount);
   });
   
-  app.post('/api/subaccounts', async (req: Request, res: Response) => {
+  app.post('/api/subaccounts', isAuthenticated, async (req: Request, res: Response) => {
     try {
       const subaccountData = insertSubaccountSchema.parse(req.body);
+      
+      // Force the userId to be the authenticated user's ID
+      subaccountData.userId = req.user.id;
+      
       const subaccount = await storage.createSubaccount(subaccountData);
       return res.status(201).json(subaccount);
     } catch (err) {
@@ -125,37 +180,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  app.put('/api/subaccounts/:id', async (req: Request, res: Response) => {
+  app.put('/api/subaccounts/:id', isAuthenticated, async (req: Request, res: Response) => {
     try {
       const subaccountId = parseInt(req.params.id);
       if (isNaN(subaccountId)) {
         return res.status(400).json({ message: 'Invalid subaccount ID' });
       }
       
-      const subaccountData = insertSubaccountSchema.partial().parse(req.body);
-      const updatedSubaccount = await storage.updateSubaccount(subaccountId, subaccountData);
-      
-      if (!updatedSubaccount) {
+      // Check if the subaccount exists and belongs to the user
+      const subaccount = await storage.getSubaccount(subaccountId);
+      if (!subaccount) {
         return res.status(404).json({ message: 'Subaccount not found' });
       }
       
+      // Ensure users can only modify their own subaccounts
+      if (subaccount.userId !== req.user.id) {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+      
+      const subaccountData = insertSubaccountSchema.partial().parse(req.body);
+      
+      // Prevent changing the userId
+      delete subaccountData.userId;
+      
+      const updatedSubaccount = await storage.updateSubaccount(subaccountId, subaccountData);
       return res.json(updatedSubaccount);
     } catch (err) {
       return handleValidationError(err, res);
     }
   });
   
-  app.delete('/api/subaccounts/:id', async (req: Request, res: Response) => {
+  app.delete('/api/subaccounts/:id', isAuthenticated, async (req: Request, res: Response) => {
     const subaccountId = parseInt(req.params.id);
     if (isNaN(subaccountId)) {
       return res.status(400).json({ message: 'Invalid subaccount ID' });
     }
     
-    const success = await storage.deleteSubaccount(subaccountId);
-    if (!success) {
+    // Check if the subaccount exists and belongs to the user
+    const subaccount = await storage.getSubaccount(subaccountId);
+    if (!subaccount) {
       return res.status(404).json({ message: 'Subaccount not found' });
     }
     
+    // Ensure users can only delete their own subaccounts
+    if (subaccount.userId !== req.user.id) {
+      return res.status(403).json({ message: 'Access denied' });
+    }
+    
+    const success = await storage.deleteSubaccount(subaccountId);
     return res.status(204).end();
   });
   
