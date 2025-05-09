@@ -232,24 +232,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Forecast routes
-  app.get('/api/forecasts', async (req: Request, res: Response) => {
-    const userId = Number(req.query.userId);
+  app.get('/api/forecasts', isAuthenticated, async (req: Request, res: Response) => {
+    // If userId isn't provided, use the authenticated user's ID
+    const userId = Number(req.query.userId) || req.user.id;
     const subaccountId = Number(req.query.subaccountId);
     
+    // Ensure users can only access their own forecasts
+    if (userId !== req.user.id) {
+      return res.status(403).json({ message: 'Access denied' });
+    }
+    
     if (subaccountId && !isNaN(subaccountId)) {
-      // If subaccountId is provided, filter by subaccount
+      // If subaccountId is provided, check it belongs to the current user
+      const subaccount = await storage.getSubaccount(subaccountId);
+      if (!subaccount || subaccount.userId !== req.user.id) {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+      
+      // If subaccountId is provided and verified, filter by subaccount
       const forecasts = await storage.getForecastsBySubaccountId(subaccountId);
       return res.json(forecasts);
-    } else if (userId && !isNaN(userId)) {
-      // If only userId is provided, filter by user
+    } else {
+      // If only userId is provided and verified, filter by user
       const forecasts = await storage.getForecastsByUserId(userId);
       return res.json(forecasts);
-    } else {
-      return res.status(400).json({ message: 'Invalid or missing user ID or subaccount ID' });
     }
   });
   
-  app.get('/api/forecasts/:id', async (req: Request, res: Response) => {
+  app.get('/api/forecasts/:id', isAuthenticated, async (req: Request, res: Response) => {
     const forecastId = parseInt(req.params.id);
     if (isNaN(forecastId)) {
       return res.status(400).json({ message: 'Invalid forecast ID' });
@@ -260,12 +270,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(404).json({ message: 'Forecast not found' });
     }
     
+    // Check if the forecast belongs to a subaccount owned by the user
+    if (forecast.subaccountId) {
+      const subaccount = await storage.getSubaccount(forecast.subaccountId);
+      if (!subaccount || subaccount.userId !== req.user.id) {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+    }
+    // Or check if the forecast is directly owned by the user
+    else if (forecast.userId !== req.user.id) {
+      return res.status(403).json({ message: 'Access denied' });
+    }
+    
     return res.json(forecast);
   });
   
-  app.post('/api/forecasts', async (req: Request, res: Response) => {
+  app.post('/api/forecasts', isAuthenticated, async (req: Request, res: Response) => {
     try {
       const forecastData = insertForecastSchema.parse(req.body);
+      
+      // Force the userId to be the authenticated user's ID
+      forecastData.userId = req.user.id;
+      
+      // If a subaccountId is provided, verify it belongs to the user
+      if (forecastData.subaccountId) {
+        const subaccount = await storage.getSubaccount(forecastData.subaccountId);
+        if (!subaccount || subaccount.userId !== req.user.id) {
+          return res.status(403).json({ message: 'Access denied: The specified subaccount does not belong to you' });
+        }
+      }
+      
       const forecast = await storage.createForecast(forecastData);
       return res.status(201).json(forecast);
     } catch (err) {
@@ -273,52 +307,112 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  app.put('/api/forecasts/:id', async (req: Request, res: Response) => {
+  app.put('/api/forecasts/:id', isAuthenticated, async (req: Request, res: Response) => {
     try {
       const forecastId = parseInt(req.params.id);
       if (isNaN(forecastId)) {
         return res.status(400).json({ message: 'Invalid forecast ID' });
       }
       
-      const forecastData = insertForecastSchema.partial().parse(req.body);
-      const updatedForecast = await storage.updateForecast(forecastId, forecastData);
-      
-      if (!updatedForecast) {
+      // Check if the forecast exists and belongs to the user
+      const forecast = await storage.getForecast(forecastId);
+      if (!forecast) {
         return res.status(404).json({ message: 'Forecast not found' });
       }
       
+      // Check ownership through subaccount or direct userId
+      let hasAccess = false;
+      if (forecast.subaccountId) {
+        const subaccount = await storage.getSubaccount(forecast.subaccountId);
+        hasAccess = subaccount && subaccount.userId === req.user.id;
+      } else {
+        hasAccess = forecast.userId === req.user.id;
+      }
+      
+      if (!hasAccess) {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+      
+      const forecastData = insertForecastSchema.partial().parse(req.body);
+      
+      // Prevent changing ownership
+      delete forecastData.userId;
+      
+      // If attempting to change the subaccountId, verify the new one belongs to the user
+      if (forecastData.subaccountId && forecastData.subaccountId !== forecast.subaccountId) {
+        const subaccount = await storage.getSubaccount(forecastData.subaccountId);
+        if (!subaccount || subaccount.userId !== req.user.id) {
+          return res.status(403).json({ message: 'Access denied: The specified subaccount does not belong to you' });
+        }
+      }
+      
+      const updatedForecast = await storage.updateForecast(forecastId, forecastData);
       return res.json(updatedForecast);
     } catch (err) {
       return handleValidationError(err, res);
     }
   });
   
-  app.delete('/api/forecasts/:id', async (req: Request, res: Response) => {
+  app.delete('/api/forecasts/:id', isAuthenticated, async (req: Request, res: Response) => {
     const forecastId = parseInt(req.params.id);
     if (isNaN(forecastId)) {
       return res.status(400).json({ message: 'Invalid forecast ID' });
     }
     
-    const success = await storage.deleteForecast(forecastId);
-    if (!success) {
+    // Check if the forecast exists and belongs to the user
+    const forecast = await storage.getForecast(forecastId);
+    if (!forecast) {
       return res.status(404).json({ message: 'Forecast not found' });
     }
     
+    // Check ownership through subaccount or direct userId
+    let hasAccess = false;
+    if (forecast.subaccountId) {
+      const subaccount = await storage.getSubaccount(forecast.subaccountId);
+      hasAccess = subaccount && subaccount.userId === req.user.id;
+    } else {
+      hasAccess = forecast.userId === req.user.id;
+    }
+    
+    if (!hasAccess) {
+      return res.status(403).json({ message: 'Access denied' });
+    }
+    
+    const success = await storage.deleteForecast(forecastId);
     return res.status(204).end();
   });
   
   // Revenue Driver routes
-  app.get('/api/revenue-drivers', async (req: Request, res: Response) => {
+  app.get('/api/revenue-drivers', isAuthenticated, async (req: Request, res: Response) => {
     const forecastId = Number(req.query.forecastId);
     if (isNaN(forecastId)) {
       return res.status(400).json({ message: 'Invalid forecast ID' });
+    }
+    
+    // Verify that the forecast belongs to the user
+    const forecast = await storage.getForecast(forecastId);
+    if (!forecast) {
+      return res.status(404).json({ message: 'Forecast not found' });
+    }
+    
+    // Check ownership through subaccount or direct userId
+    let hasAccess = false;
+    if (forecast.subaccountId) {
+      const subaccount = await storage.getSubaccount(forecast.subaccountId);
+      hasAccess = subaccount && subaccount.userId === req.user.id;
+    } else {
+      hasAccess = forecast.userId === req.user.id;
+    }
+    
+    if (!hasAccess) {
+      return res.status(403).json({ message: 'Access denied' });
     }
     
     const drivers = await storage.getRevenueDriversByForecastId(forecastId);
     return res.json(drivers);
   });
   
-  app.get('/api/revenue-drivers/:id', async (req: Request, res: Response) => {
+  app.get('/api/revenue-drivers/:id', isAuthenticated, async (req: Request, res: Response) => {
     const driverId = parseInt(req.params.id);
     if (isNaN(driverId)) {
       return res.status(400).json({ message: 'Invalid driver ID' });
@@ -329,12 +423,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(404).json({ message: 'Revenue driver not found' });
     }
     
+    // Verify that the forecast belongs to the user
+    const forecast = await storage.getForecast(driver.forecastId);
+    if (!forecast) {
+      return res.status(404).json({ message: 'Associated forecast not found' });
+    }
+    
+    // Check ownership through subaccount or direct userId
+    let hasAccess = false;
+    if (forecast.subaccountId) {
+      const subaccount = await storage.getSubaccount(forecast.subaccountId);
+      hasAccess = subaccount && subaccount.userId === req.user.id;
+    } else {
+      hasAccess = forecast.userId === req.user.id;
+    }
+    
+    if (!hasAccess) {
+      return res.status(403).json({ message: 'Access denied' });
+    }
+    
     return res.json(driver);
   });
   
-  app.post('/api/revenue-drivers', async (req: Request, res: Response) => {
+  app.post('/api/revenue-drivers', isAuthenticated, async (req: Request, res: Response) => {
     try {
       const driverData = insertRevenueDriverSchema.parse(req.body);
+      
+      // Verify that the forecast belongs to the user
+      const forecast = await storage.getForecast(driverData.forecastId);
+      if (!forecast) {
+        return res.status(404).json({ message: 'Forecast not found' });
+      }
+      
+      // Check ownership through subaccount or direct userId
+      let hasAccess = false;
+      if (forecast.subaccountId) {
+        const subaccount = await storage.getSubaccount(forecast.subaccountId);
+        hasAccess = subaccount && subaccount.userId === req.user.id;
+      } else {
+        hasAccess = forecast.userId === req.user.id;
+      }
+      
+      if (!hasAccess) {
+        return res.status(403).json({ message: 'Access denied: The specified forecast does not belong to you' });
+      }
+      
       const driver = await storage.createRevenueDriver(driverData);
       return res.status(201).json(driver);
     } catch (err) {
@@ -342,37 +475,100 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  app.put('/api/revenue-drivers/:id', async (req: Request, res: Response) => {
+  app.put('/api/revenue-drivers/:id', isAuthenticated, async (req: Request, res: Response) => {
     try {
       const driverId = parseInt(req.params.id);
       if (isNaN(driverId)) {
         return res.status(400).json({ message: 'Invalid driver ID' });
       }
       
-      const driverData = insertRevenueDriverSchema.partial().parse(req.body);
-      const updatedDriver = await storage.updateRevenueDriver(driverId, driverData);
-      
-      if (!updatedDriver) {
+      // Get the current driver
+      const driver = await storage.getRevenueDriver(driverId);
+      if (!driver) {
         return res.status(404).json({ message: 'Revenue driver not found' });
       }
       
+      // Verify that the forecast belongs to the user
+      const forecast = await storage.getForecast(driver.forecastId);
+      if (!forecast) {
+        return res.status(404).json({ message: 'Associated forecast not found' });
+      }
+      
+      // Check ownership through subaccount or direct userId
+      let hasAccess = false;
+      if (forecast.subaccountId) {
+        const subaccount = await storage.getSubaccount(forecast.subaccountId);
+        hasAccess = subaccount && subaccount.userId === req.user.id;
+      } else {
+        hasAccess = forecast.userId === req.user.id;
+      }
+      
+      if (!hasAccess) {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+      
+      const driverData = insertRevenueDriverSchema.partial().parse(req.body);
+      
+      // If changing the forecastId, verify the new forecast also belongs to the user
+      if (driverData.forecastId && driverData.forecastId !== driver.forecastId) {
+        const newForecast = await storage.getForecast(driverData.forecastId);
+        if (!newForecast) {
+          return res.status(404).json({ message: 'New forecast not found' });
+        }
+        
+        // Check ownership of the new forecast
+        let hasAccessToNewForecast = false;
+        if (newForecast.subaccountId) {
+          const subaccount = await storage.getSubaccount(newForecast.subaccountId);
+          hasAccessToNewForecast = subaccount && subaccount.userId === req.user.id;
+        } else {
+          hasAccessToNewForecast = newForecast.userId === req.user.id;
+        }
+        
+        if (!hasAccessToNewForecast) {
+          return res.status(403).json({ message: 'Access denied: The specified forecast does not belong to you' });
+        }
+      }
+      
+      const updatedDriver = await storage.updateRevenueDriver(driverId, driverData);
       return res.json(updatedDriver);
     } catch (err) {
       return handleValidationError(err, res);
     }
   });
   
-  app.delete('/api/revenue-drivers/:id', async (req: Request, res: Response) => {
+  app.delete('/api/revenue-drivers/:id', isAuthenticated, async (req: Request, res: Response) => {
     const driverId = parseInt(req.params.id);
     if (isNaN(driverId)) {
       return res.status(400).json({ message: 'Invalid driver ID' });
     }
     
-    const success = await storage.deleteRevenueDriver(driverId);
-    if (!success) {
+    // Get the current driver
+    const driver = await storage.getRevenueDriver(driverId);
+    if (!driver) {
       return res.status(404).json({ message: 'Revenue driver not found' });
     }
     
+    // Verify that the forecast belongs to the user
+    const forecast = await storage.getForecast(driver.forecastId);
+    if (!forecast) {
+      return res.status(404).json({ message: 'Associated forecast not found' });
+    }
+    
+    // Check ownership through subaccount or direct userId
+    let hasAccess = false;
+    if (forecast.subaccountId) {
+      const subaccount = await storage.getSubaccount(forecast.subaccountId);
+      hasAccess = subaccount && subaccount.userId === req.user.id;
+    } else {
+      hasAccess = forecast.userId === req.user.id;
+    }
+    
+    if (!hasAccess) {
+      return res.status(403).json({ message: 'Access denied' });
+    }
+    
+    const success = await storage.deleteRevenueDriver(driverId);
     return res.status(204).end();
   });
   

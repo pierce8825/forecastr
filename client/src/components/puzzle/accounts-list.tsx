@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -22,7 +22,7 @@ export function AccountsList({ workspaceId }: AccountsListProps) {
   const { user } = useAuth();
   const [filter, setFilter] = useState('all');
   
-  const { data: accounts, isLoading, isError } = useQuery({
+  const { data: accounts = [], isLoading, isError } = useQuery<PuzzleAccount[]>({
     queryKey: [`/api/puzzle/accounts/${user?.id || ''}`],
     enabled: !!workspaceId && !!user?.id,
   });
@@ -47,7 +47,7 @@ export function AccountsList({ workspaceId }: AccountsListProps) {
     );
   }
 
-  if (isError || !accounts || accounts.length === 0) {
+  if (isError || accounts.length === 0) {
     return (
       <Card>
         <CardHeader>
@@ -81,10 +81,10 @@ export function AccountsList({ workspaceId }: AccountsListProps) {
   // Filter accounts based on type
   const filteredAccounts = filter === 'all' 
     ? accounts 
-    : accounts.filter(account => account.accountType === filter);
+    : accounts.filter((account: PuzzleAccount) => account.accountType === filter);
 
   // Get unique account types for filters
-  const accountTypes = [...new Set(accounts.map(account => account.accountType))];
+  const accountTypes = Array.from(new Set(accounts.map((account: PuzzleAccount) => account.accountType)));
 
   return (
     <Card>
@@ -122,7 +122,7 @@ export function AccountsList({ workspaceId }: AccountsListProps) {
             </TableHeader>
             <TableBody>
               {filteredAccounts.length > 0 ? (
-                filteredAccounts.map((account) => (
+                filteredAccounts.map((account: PuzzleAccount) => (
                   <TableRow key={account.id}>
                     <TableCell className="font-medium">{account.name}</TableCell>
                     <TableCell>
