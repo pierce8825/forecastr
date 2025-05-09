@@ -25,6 +25,9 @@ import puzzleRouter from "./routes/puzzle";
 import { setupAuth } from "./auth";
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Set up authentication
+  setupAuth(app);
+  
   // Error handler for validation errors
   const handleValidationError = (err: unknown, res: Response) => {
     if (err instanceof ZodError) {
@@ -37,6 +40,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     
     console.error('Error:', err);
     return res.status(500).json({ message: 'Internal server error' });
+  };
+  
+  // Middleware to check if user is authenticated
+  const isAuthenticated = (req: Request, res: Response, next: Function) => {
+    if (req.isAuthenticated()) {
+      return next();
+    }
+    return res.status(401).json({ message: 'Not authenticated' });
   };
 
   // User routes

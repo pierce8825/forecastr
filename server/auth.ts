@@ -165,7 +165,7 @@ export function setupAuth(app: Express) {
       return res.status(401).json({ message: "Not authenticated" });
     }
     
-    const user = req.user as User;
+    const user = req.user as Express.User;
     res.json({
       id: user.id,
       email: user.email,
