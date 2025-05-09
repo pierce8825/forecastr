@@ -2,11 +2,9 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { apiRequest } from '@/lib/queryClient';
-
-// Assuming user context or state management provides the user ID
-// For simplicity, we're using a hardcoded value
-const USER_ID = 1;
+import { Button } from '@/components/ui/button';
+import { Link, Settings } from 'lucide-react';
+import { useAuth } from '@/hooks/use-auth';
 
 export interface PuzzleAccount {
   id: string;
@@ -21,11 +19,12 @@ interface AccountsListProps {
 }
 
 export function AccountsList({ workspaceId }: AccountsListProps) {
+  const { user } = useAuth();
   const [filter, setFilter] = useState('all');
   
   const { data: accounts, isLoading, isError } = useQuery({
-    queryKey: [`/api/puzzle/accounts/${USER_ID}`],
-    enabled: !!workspaceId,
+    queryKey: [`/api/puzzle/accounts/${user?.id || ''}`],
+    enabled: !!workspaceId && !!user?.id,
   });
 
   if (!workspaceId) {
@@ -48,105 +47,68 @@ export function AccountsList({ workspaceId }: AccountsListProps) {
     );
   }
 
-  if (isError) {
+  if (isError || !accounts || accounts.length === 0) {
     return (
       <Card>
         <CardHeader>
           <CardTitle>Accounts</CardTitle>
-          <CardDescription>Failed to load accounts</CardDescription>
+          <CardDescription>Your financial accounts from accounting integrations</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="p-4 border border-red-300 bg-red-50 text-red-800 rounded-md">
-            There was an error loading your accounts from Puzzle.io. Please try again later or reconnect your account.
+          <div className="p-6 border border-dashed rounded-md flex flex-col items-center justify-center">
+            <div className="text-center space-y-2 mb-4">
+              <h3 className="font-semibold text-lg">No Accounts Connected</h3>
+              <p className="text-muted-foreground text-sm max-w-md">
+                Connect your accounting software to import your financial accounts or create a new account manually.
+              </p>
+            </div>
+            <div className="flex gap-4">
+              <Button variant="outline" size="sm">
+                <Settings className="h-4 w-4 mr-2" />
+                Connect Accounting
+              </Button>
+              <Button size="sm">
+                <Link className="h-4 w-4 mr-2" />
+                Create Account
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>
     );
   }
 
-  // In a real implementation, this would be provided by the API
-  // For now, we'll just return placeholder accounts data
-  const placeholderAccounts: PuzzleAccount[] = [
-    {
-      id: '1',
-      name: 'Business Checking',
-      accountType: 'BANK',
-      balance: 25000.00,
-      currency: 'USD'
-    },
-    {
-      id: '2',
-      name: 'Business Savings',
-      accountType: 'BANK',
-      balance: 150000.00,
-      currency: 'USD'
-    },
-    {
-      id: '3',
-      name: 'Accounts Receivable',
-      accountType: 'ACCOUNTS_RECEIVABLE',
-      balance: 45000.00,
-      currency: 'USD'
-    },
-    {
-      id: '4',
-      name: 'Accounts Payable',
-      accountType: 'ACCOUNTS_PAYABLE',
-      balance: -15000.00,
-      currency: 'USD'
-    },
-    {
-      id: '5',
-      name: 'Revenue',
-      accountType: 'REVENUE',
-      balance: 250000.00,
-      currency: 'USD'
-    }
-  ];
-
   // Filter accounts based on type
   const filteredAccounts = filter === 'all' 
-    ? placeholderAccounts 
-    : placeholderAccounts.filter(account => account.accountType === filter);
+    ? accounts 
+    : accounts.filter(account => account.accountType === filter);
+
+  // Get unique account types for filters
+  const accountTypes = [...new Set(accounts.map(account => account.accountType))];
 
   return (
     <Card>
       <CardHeader>
         <CardTitle>Accounts</CardTitle>
-        <CardDescription>Your financial accounts from Puzzle.io</CardDescription>
+        <CardDescription>Your financial accounts from accounting integrations</CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="flex gap-2 mb-4">
+        <div className="flex gap-2 mb-4 flex-wrap">
           <button 
             onClick={() => setFilter('all')}
             className={`px-3 py-1 text-sm rounded-full ${filter === 'all' ? 'bg-primary text-primary-foreground' : 'bg-secondary text-secondary-foreground'}`}
           >
             All
           </button>
-          <button 
-            onClick={() => setFilter('BANK')}
-            className={`px-3 py-1 text-sm rounded-full ${filter === 'BANK' ? 'bg-primary text-primary-foreground' : 'bg-secondary text-secondary-foreground'}`}
-          >
-            Bank
-          </button>
-          <button 
-            onClick={() => setFilter('ACCOUNTS_RECEIVABLE')}
-            className={`px-3 py-1 text-sm rounded-full ${filter === 'ACCOUNTS_RECEIVABLE' ? 'bg-primary text-primary-foreground' : 'bg-secondary text-secondary-foreground'}`}
-          >
-            Receivable
-          </button>
-          <button 
-            onClick={() => setFilter('ACCOUNTS_PAYABLE')}
-            className={`px-3 py-1 text-sm rounded-full ${filter === 'ACCOUNTS_PAYABLE' ? 'bg-primary text-primary-foreground' : 'bg-secondary text-secondary-foreground'}`}
-          >
-            Payable
-          </button>
-          <button 
-            onClick={() => setFilter('REVENUE')}
-            className={`px-3 py-1 text-sm rounded-full ${filter === 'REVENUE' ? 'bg-primary text-primary-foreground' : 'bg-secondary text-secondary-foreground'}`}
-          >
-            Revenue
-          </button>
+          {accountTypes.map(type => (
+            <button 
+              key={type}
+              onClick={() => setFilter(type)}
+              className={`px-3 py-1 text-sm rounded-full ${filter === type ? 'bg-primary text-primary-foreground' : 'bg-secondary text-secondary-foreground'}`}
+            >
+              {type.replace(/_/g, ' ')}
+            </button>
+          ))}
         </div>
         
         <div className="border rounded-md">
@@ -159,22 +121,30 @@ export function AccountsList({ workspaceId }: AccountsListProps) {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredAccounts.map((account) => (
-                <TableRow key={account.id}>
-                  <TableCell className="font-medium">{account.name}</TableCell>
-                  <TableCell>
-                    <span className="px-2 py-1 text-xs rounded-full bg-secondary">
-                      {account.accountType.replace(/_/g, ' ')}
-                    </span>
-                  </TableCell>
-                  <TableCell className={`text-right ${account.balance < 0 ? 'text-red-600' : ''}`}>
-                    {new Intl.NumberFormat('en-US', {
-                      style: 'currency',
-                      currency: account.currency
-                    }).format(account.balance)}
+              {filteredAccounts.length > 0 ? (
+                filteredAccounts.map((account) => (
+                  <TableRow key={account.id}>
+                    <TableCell className="font-medium">{account.name}</TableCell>
+                    <TableCell>
+                      <span className="px-2 py-1 text-xs rounded-full bg-secondary">
+                        {account.accountType.replace(/_/g, ' ')}
+                      </span>
+                    </TableCell>
+                    <TableCell className={`text-right ${account.balance < 0 ? 'text-red-600' : ''}`}>
+                      {new Intl.NumberFormat('en-US', {
+                        style: 'currency',
+                        currency: account.currency
+                      }).format(account.balance)}
+                    </TableCell>
+                  </TableRow>
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell colSpan={3} className="text-center py-6 text-muted-foreground">
+                    No accounts found matching the selected filter
                   </TableCell>
                 </TableRow>
-              ))}
+              )}
             </TableBody>
           </Table>
         </div>

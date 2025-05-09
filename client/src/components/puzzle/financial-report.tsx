@@ -3,10 +3,9 @@ import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { apiRequest } from '@/lib/queryClient';
-
-// Assuming user context or state management provides the user ID
-// For simplicity, we're using a hardcoded value
-const USER_ID = 1;
+import { useAuth } from '@/hooks/use-auth';
+import { Button } from '@/components/ui/button';
+import { Settings, Link } from 'lucide-react';
 
 export enum ReportType {
   PROFIT_AND_LOSS = 'profit-and-loss',
@@ -20,16 +19,18 @@ interface ReportItem {
   detail?: ReportItem[];
 }
 
+interface ReportSection {
+  name: string;
+  items: ReportItem[];
+  total: number;
+}
+
 interface ReportData {
   title: string;
   subtitle: string;
   startDate: string;
   endDate: string;
-  sections: {
-    name: string;
-    items: ReportItem[];
-    total: number;
-  }[];
+  sections: ReportSection[];
   total: number;
 }
 
@@ -39,11 +40,12 @@ interface FinancialReportProps {
 }
 
 export function FinancialReport({ workspaceId, reportType }: FinancialReportProps) {
+  const { user } = useAuth();
   const [isExpanded, setIsExpanded] = useState(false);
 
-  const { data: report, isLoading, isError } = useQuery({
-    queryKey: [`/api/puzzle/reports/${USER_ID}/${reportType}?startDate=2025-01-01&endDate=2025-05-01`],
-    enabled: !!workspaceId,
+  const { data, isLoading, isError } = useQuery<ReportData | null>({
+    queryKey: [`/api/puzzle/reports/${user?.id || ''}/${reportType}`],
+    enabled: !!workspaceId && !!user?.id,
   });
 
   // Generate title based on report type
@@ -94,7 +96,7 @@ export function FinancialReport({ workspaceId, reportType }: FinancialReportProp
     );
   }
 
-  if (isError) {
+  if (isError || !data || !data.sections || data.sections.length === 0) {
     return (
       <Card>
         <CardHeader>
@@ -102,95 +104,28 @@ export function FinancialReport({ workspaceId, reportType }: FinancialReportProp
           <CardDescription>{getReportDescription()}</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="p-4 border border-red-300 bg-red-50 text-red-800 rounded-md">
-            There was an error loading your {getReportTitle().toLowerCase()} from Puzzle.io. Please try again later or reconnect your account.
+          <div className="p-6 border border-dashed rounded-md flex flex-col items-center justify-center">
+            <div className="text-center space-y-2 mb-4">
+              <h3 className="font-semibold text-lg">No Financial Data Available</h3>
+              <p className="text-muted-foreground text-sm max-w-md">
+                Connect your accounting software to import your financial data or create a forecast to generate financial reports.
+              </p>
+            </div>
+            <div className="flex gap-4">
+              <Button variant="outline" size="sm">
+                <Settings className="h-4 w-4 mr-2" />
+                Connect Accounting
+              </Button>
+              <Button size="sm">
+                <Link className="h-4 w-4 mr-2" />
+                Create a Forecast
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>
     );
   }
-
-  // Mock financial report data
-  const mockProfitLossData: ReportData = {
-    title: 'Profit and Loss Statement',
-    subtitle: 'January 1, 2025 - May 1, 2025',
-    startDate: '2025-01-01',
-    endDate: '2025-05-01',
-    sections: [
-      {
-        name: 'Income',
-        items: [
-          { name: 'Sales Revenue', amount: 450000 },
-          { name: 'Service Revenue', amount: 175000 },
-          { name: 'Subscription Revenue', amount: 225000 },
-        ],
-        total: 850000,
-      },
-      {
-        name: 'Cost of Goods Sold',
-        items: [
-          { name: 'Materials', amount: 125000 },
-          { name: 'Labor', amount: 175000 },
-          { name: 'Overhead', amount: 50000 },
-        ],
-        total: 350000,
-      },
-      {
-        name: 'Expenses',
-        items: [
-          { name: 'Salaries and Wages', amount: 200000 },
-          { name: 'Rent and Utilities', amount: 35000 },
-          { name: 'Marketing', amount: 45000 },
-          { name: 'Software and Technology', amount: 20000 },
-          { name: 'Professional Services', amount: 15000 },
-        ],
-        total: 315000,
-      },
-    ],
-    total: 185000, // Income - COGS - Expenses
-  };
-
-  const mockBalanceSheetData: ReportData = {
-    title: 'Balance Sheet',
-    subtitle: 'As of May 1, 2025',
-    startDate: '2025-01-01',
-    endDate: '2025-05-01',
-    sections: [
-      {
-        name: 'Assets',
-        items: [
-          { name: 'Cash and Equivalents', amount: 250000 },
-          { name: 'Accounts Receivable', amount: 175000 },
-          { name: 'Inventory', amount: 125000 },
-          { name: 'Property and Equipment', amount: 350000 },
-        ],
-        total: 900000,
-      },
-      {
-        name: 'Liabilities',
-        items: [
-          { name: 'Accounts Payable', amount: 85000 },
-          { name: 'Loans Payable', amount: 250000 },
-          { name: 'Accrued Expenses', amount: 45000 },
-        ],
-        total: 380000,
-      },
-      {
-        name: 'Equity',
-        items: [
-          { name: 'Owner Capital', amount: 400000 },
-          { name: 'Retained Earnings', amount: 120000 },
-        ],
-        total: 520000,
-      },
-    ],
-    total: 900000, // Assets = Liabilities + Equity
-  };
-
-  // Select the appropriate mock data based on report type
-  const reportData = reportType === ReportType.PROFIT_AND_LOSS 
-    ? mockProfitLossData 
-    : mockBalanceSheetData;
 
   return (
     <Card>
@@ -212,7 +147,7 @@ export function FinancialReport({ workspaceId, reportType }: FinancialReportProp
         {!isExpanded ? (
           <div className="p-4 border rounded-md bg-card">
             <div className="text-sm text-muted-foreground mb-2">
-              {reportData.subtitle}
+              {data.subtitle}
             </div>
             <div className="flex justify-between items-center">
               <div>
@@ -221,7 +156,7 @@ export function FinancialReport({ workspaceId, reportType }: FinancialReportProp
                     style: 'currency',
                     currency: 'USD',
                     maximumFractionDigits: 0,
-                  }).format(reportData.total)}
+                  }).format(data.total)}
                 </span>
                 <span className="text-sm text-muted-foreground ml-2">
                   {reportType === ReportType.PROFIT_AND_LOSS ? 'Net Income' : 'Total Assets'}
@@ -236,7 +171,7 @@ export function FinancialReport({ workspaceId, reportType }: FinancialReportProp
                     style: 'currency',
                     currency: 'USD',
                     maximumFractionDigits: 0,
-                  }).format(reportData.sections[0].total)}
+                  }).format(data.sections[0].total)}
                 </div>
               </div>
             </div>
@@ -244,7 +179,7 @@ export function FinancialReport({ workspaceId, reportType }: FinancialReportProp
         ) : (
           <div className="border rounded-md">
             <div className="p-3 border-b bg-muted/50">
-              <div className="text-sm font-medium">{reportData.subtitle}</div>
+              <div className="text-sm font-medium">{data.subtitle}</div>
             </div>
             <Table>
               <TableHeader>
@@ -254,9 +189,9 @@ export function FinancialReport({ workspaceId, reportType }: FinancialReportProp
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {reportData.sections.map((section) => (
-                  <>
-                    <TableRow key={section.name} className="bg-muted/30">
+                {data.sections.map((section: ReportSection) => (
+                  <React.Fragment key={section.name}>
+                    <TableRow className="bg-muted/30">
                       <TableCell className="font-medium">{section.name}</TableCell>
                       <TableCell className="text-right">
                         {new Intl.NumberFormat('en-US', {
@@ -265,7 +200,7 @@ export function FinancialReport({ workspaceId, reportType }: FinancialReportProp
                         }).format(section.total)}
                       </TableCell>
                     </TableRow>
-                    {section.items.map((item) => (
+                    {section.items.map((item: ReportItem) => (
                       <TableRow key={item.name}>
                         <TableCell className="pl-8">{item.name}</TableCell>
                         <TableCell className="text-right">
@@ -276,7 +211,7 @@ export function FinancialReport({ workspaceId, reportType }: FinancialReportProp
                         </TableCell>
                       </TableRow>
                     ))}
-                  </>
+                  </React.Fragment>
                 ))}
                 <TableRow className="font-bold">
                   <TableCell>
@@ -286,7 +221,7 @@ export function FinancialReport({ workspaceId, reportType }: FinancialReportProp
                     {new Intl.NumberFormat('en-US', {
                       style: 'currency',
                       currency: 'USD',
-                    }).format(reportData.total)}
+                    }).format(data.total)}
                   </TableCell>
                 </TableRow>
               </TableBody>
