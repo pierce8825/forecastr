@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import RevenueDrivers from "@/components/dashboard/revenue-drivers";
 import { RevenueStreams } from "@/components/dashboard/revenue-streams";
+import { DriverStreamMapping } from "@/components/dashboard/driver-stream-mapping";
 
 const Revenue = () => {
   const [activeTab, setActiveTab] = useState("overview");
