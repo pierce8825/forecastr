@@ -1,5 +1,6 @@
 import {
   User, InsertUser,
+  Subaccount, InsertSubaccount,
   Forecast, InsertForecast,
   RevenueDriver, InsertRevenueDriver,
   RevenueStream, InsertRevenueStream,
@@ -13,7 +14,7 @@ import {
   Employee, InsertEmployee,
   Payroll, InsertPayroll,
   PayrollItem, InsertPayrollItem,
-  users, forecasts, revenueDrivers, revenueStreams, revenueDriverToStream,
+  users, subaccounts, forecasts, revenueDrivers, revenueStreams, revenueDriverToStream,
   expenses, departments, personnelRoles, customFormulas, puzzleIntegrations,
   financialProjections, employees, payrolls, payrollItems
 } from "@shared/schema";
@@ -28,8 +29,16 @@ export interface IStorage {
   getUserByEmail(email: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
   
+  // Subaccount operations
+  getSubaccountsByUserId(userId: number): Promise<Subaccount[]>;
+  getSubaccount(id: number): Promise<Subaccount | undefined>;
+  createSubaccount(subaccount: InsertSubaccount): Promise<Subaccount>;
+  updateSubaccount(id: number, subaccount: Partial<InsertSubaccount>): Promise<Subaccount | undefined>;
+  deleteSubaccount(id: number): Promise<boolean>;
+  
   // Forecast operations
   getForecastsByUserId(userId: number): Promise<Forecast[]>;
+  getForecastsBySubaccountId(subaccountId: number): Promise<Forecast[]>;
   getForecast(id: number): Promise<Forecast | undefined>;
   createForecast(forecast: InsertForecast): Promise<Forecast>;
   updateForecast(id: number, forecast: Partial<InsertForecast>): Promise<Forecast | undefined>;
@@ -101,6 +110,7 @@ export interface IStorage {
   
   // Employee operations
   getEmployeesByUserId(userId: number): Promise<Employee[]>;
+  getEmployeesBySubaccountId(subaccountId: number): Promise<Employee[]>;
   getEmployee(id: number): Promise<Employee | undefined>;
   getEmployeeByEmail(email: string): Promise<Employee | undefined>;
   createEmployee(employee: InsertEmployee): Promise<Employee>;
@@ -109,6 +119,7 @@ export interface IStorage {
   
   // Payroll operations
   getPayrollsByUserId(userId: number): Promise<Payroll[]>;
+  getPayrollsBySubaccountId(subaccountId: number): Promise<Payroll[]>;
   getPayroll(id: number): Promise<Payroll | undefined>;
   createPayroll(payroll: InsertPayroll): Promise<Payroll>;
   updatePayroll(id: number, payroll: Partial<InsertPayroll>): Promise<Payroll | undefined>;
@@ -147,6 +158,47 @@ export class DatabaseStorage implements IStorage {
       .returning();
     return user;
   }
+
+  // Subaccount operations
+  async getSubaccountsByUserId(userId: number): Promise<Subaccount[]> {
+    return await db
+      .select()
+      .from(subaccounts)
+      .where(eq(subaccounts.userId, userId));
+  }
+
+  async getSubaccount(id: number): Promise<Subaccount | undefined> {
+    const [subaccount] = await db
+      .select()
+      .from(subaccounts)
+      .where(eq(subaccounts.id, id));
+    return subaccount || undefined;
+  }
+
+  async createSubaccount(insertSubaccount: InsertSubaccount): Promise<Subaccount> {
+    const [subaccount] = await db
+      .insert(subaccounts)
+      .values(insertSubaccount)
+      .returning();
+    return subaccount;
+  }
+
+  async updateSubaccount(id: number, updateData: Partial<InsertSubaccount>): Promise<Subaccount | undefined> {
+    const [updatedSubaccount] = await db
+      .update(subaccounts)
+      .set(updateData)
+      .where(eq(subaccounts.id, id))
+      .returning();
+    return updatedSubaccount || undefined;
+  }
+
+  async deleteSubaccount(id: number): Promise<boolean> {
+    const [deletedSubaccount] = await db
+      .delete(subaccounts)
+      .where(eq(subaccounts.id, id))
+      .returning();
+    return !!deletedSubaccount;
+  }
   
   // Forecast operations
   async getForecastsByUserId(userId: number): Promise<Forecast[]> {
@@ -154,6 +206,13 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(forecasts)
       .where(eq(forecasts.userId, userId));
+  }
+  
+  async getForecastsBySubaccountId(subaccountId: number): Promise<Forecast[]> {
+    return await db
+      .select()
+      .from(forecasts)
+      .where(eq(forecasts.subaccountId, subaccountId));
   }
 
   async getForecast(id: number): Promise<Forecast | undefined> {
@@ -591,6 +650,13 @@ export class DatabaseStorage implements IStorage {
       .from(employees)
       .where(eq(employees.userId, userId));
   }
+  
+  async getEmployeesBySubaccountId(subaccountId: number): Promise<Employee[]> {
+    return await db
+      .select()
+      .from(employees)
+      .where(eq(employees.subaccountId, subaccountId));
+  }
 
   async getEmployee(id: number): Promise<Employee | undefined> {
     const [employee] = await db
@@ -639,6 +705,13 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(payrolls)
       .where(eq(payrolls.userId, userId));
+  }
+  
+  async getPayrollsBySubaccountId(subaccountId: number): Promise<Payroll[]> {
+    return await db
+      .select()
+      .from(payrolls)
+      .where(eq(payrolls.subaccountId, subaccountId));
   }
 
   async getPayroll(id: number): Promise<Payroll | undefined> {
