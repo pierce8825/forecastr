@@ -27,7 +27,7 @@ import { EmployeeDialog } from "@/components/payroll/employee-dialog";
 
 const Payroll = () => {
   const [activeTab, setActiveTab] = useState("upcoming");
-  const [showEmployeeDialog, setShowEmployeeDialog] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false); 
   const { toast } = useToast();
   
   // Fetch employees
@@ -134,7 +134,7 @@ const Payroll = () => {
               <Plus className="mr-2 h-4 w-4" />
               New Payroll Run
             </Button>
-            <Button variant="outline" onClick={() => setShowEmployeeDialog(true)}>
+            <Button variant="outline" onClick={() => setDialogOpen(true)}>
               <UserPlus className="mr-2 h-4 w-4" />
               Add Employee
             </Button>
@@ -195,7 +195,7 @@ const Payroll = () => {
                   <Download className="mr-2 h-4 w-4" />
                   Export
                 </Button>
-                <Button onClick={() => setShowEmployeeDialog(true)}>
+                <Button onClick={() => setDialogOpen(true)}>
                   <UserPlus className="mr-2 h-4 w-4" />
                   Add Employee
                 </Button>
@@ -240,7 +240,7 @@ const Payroll = () => {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    employees?.map((employee) => (
+                    employees?.map((employee: any) => (
                       <TableRow key={employee.id}>
                         <TableCell className="font-medium">{`${employee.firstName} ${employee.lastName}`}</TableCell>
                         <TableCell>{employee.departmentId ? `Dept ${employee.departmentId}` : "Unassigned"}</TableCell>
@@ -371,8 +371,8 @@ const Payroll = () => {
       </div>
       
       <EmployeeDialog
-        open={showEmployeeDialog}
-        onOpenChange={setShowEmployeeDialog}
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
       />
     </>
   );
