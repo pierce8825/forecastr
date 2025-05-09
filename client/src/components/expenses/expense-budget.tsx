@@ -74,9 +74,9 @@ export const ExpenseBudget: React.FC<ExpenseBudgetProps> = ({ forecastId }) => {
     queryKey: ["/api/expense-budgets", { forecastId, year }],
     queryFn: async () => {
       if (!forecastId) return [];
-      // We'll implement this API endpoint later
-      // For now, return some mock data
-      return [];
+      const res = await fetch(`/api/expense-budgets?forecastId=${forecastId}${year ? `&year=${year}` : ""}`);
+      if (!res.ok) throw new Error("Failed to fetch expense budgets");
+      return res.json();
     },
     enabled: !!forecastId,
   });
@@ -197,13 +197,19 @@ export const ExpenseBudget: React.FC<ExpenseBudgetProps> = ({ forecastId }) => {
                 </div>
                 <div>
                   <label className="text-sm font-medium mb-1 block">Department</label>
-                  <Select value={department} onValueChange={setDepartment} disabled={isFormDisabled}>
+                  <Select 
+                    value={department} 
+                    onValueChange={(value) => {
+                      setDepartment(value);
+                    }} 
+                    disabled={isFormDisabled}
+                  >
                     <SelectTrigger>
                       <SelectValue placeholder="Select a department" />
                     </SelectTrigger>
                     <SelectContent>
                       {departments?.map((dept: any) => (
-                        <SelectItem key={dept.id} value={dept.id.toString()}>
+                        <SelectItem key={dept.id} value={dept.name}>
                           {dept.name}
                         </SelectItem>
                       ))}
@@ -307,7 +313,7 @@ export const ExpenseBudget: React.FC<ExpenseBudgetProps> = ({ forecastId }) => {
                 {budgets && budgets.map((budget: any) => (
                   <TableRow key={budget.id}>
                     <TableCell className="font-medium">{budget.category}</TableCell>
-                    <TableCell>{budget.departmentName || '-'}</TableCell>
+                    <TableCell>{budget.department || '-'}</TableCell>
                     <TableCell className="text-right font-medium">
                       {formatCurrency(budget.amount)}
                     </TableCell>

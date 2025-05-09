@@ -407,18 +407,25 @@ export class DatabaseStorage implements IStorage {
   
   // Expense Budget operations
   async getExpenseBudgets(forecastId: number, year?: number): Promise<ExpenseBudget[]> {
-    let query = db.select().from(expenseBudgets);
-    
-    // Apply the base condition for forecastId
-    query = query.where(eq(expenseBudgets.forecastId, forecastId));
-    
-    // Apply additional year filter if provided
+    // Base query with forecast filter
     if (year) {
-      query = query.where(eq(expenseBudgets.year, year));
+      // With year filter
+      return db
+        .select()
+        .from(expenseBudgets)
+        .where(and(
+          eq(expenseBudgets.forecastId, forecastId),
+          eq(expenseBudgets.year, year)
+        ))
+        .orderBy(expenseBudgets.category);
+    } else {
+      // Without year filter
+      return db
+        .select()
+        .from(expenseBudgets)
+        .where(eq(expenseBudgets.forecastId, forecastId))
+        .orderBy(expenseBudgets.category);
     }
-    
-    const results = await query.orderBy(expenseBudgets.category);
-    return results;
   }
 
   async getExpenseBudgetById(id: number): Promise<ExpenseBudget | undefined> {
