@@ -17,6 +17,7 @@ export const DriverStreamMapping: React.FC<DriverStreamMappingProps> = ({ foreca
   const [streamId, setStreamId] = useState<string>("");
   const [multiplier, setMultiplier] = useState<string>("");
   const queryClient = useQueryClient();
+  const { toast } = useToast();
 
   // Fetch revenue drivers
   const { data: drivers, isLoading: isLoadingDrivers } = useQuery({
@@ -53,14 +54,11 @@ export const DriverStreamMapping: React.FC<DriverStreamMappingProps> = ({ foreca
     },
     enabled: !!forecastId,
   });
-
+  
   // Create mapping mutation
   const createMapping = useMutation({
     mutationFn: (mappingData: any) => {
-      return apiRequest("/api/driver-stream-mappings", {
-        method: "POST",
-        body: JSON.stringify(mappingData),
-      });
+      return apiRequest("/api/driver-stream-mappings", "POST", mappingData);
     },
     onSuccess: () => {
       toast({
@@ -84,9 +82,7 @@ export const DriverStreamMapping: React.FC<DriverStreamMappingProps> = ({ foreca
   // Delete mapping mutation
   const deleteMapping = useMutation({
     mutationFn: (id: number) => {
-      return apiRequest(`/api/driver-stream-mappings/${id}`, {
-        method: "DELETE",
-      });
+      return apiRequest(`/api/driver-stream-mappings/${id}`, "DELETE", null);
     },
     onSuccess: () => {
       toast({

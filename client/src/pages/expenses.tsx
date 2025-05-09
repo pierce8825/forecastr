@@ -3,6 +3,7 @@ import { Helmet } from "react-helmet";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ExpenseCategories } from "@/components/dashboard/expense-categories";
+import { ExpenseBudget } from "@/components/expenses/expense-budget";
 
 const Expenses = () => {
   const [activeTab, setActiveTab] = useState("overview");
@@ -58,16 +59,7 @@ const Expenses = () => {
           </TabsContent>
           
           <TabsContent value="budgets">
-            <Card>
-              <CardHeader>
-                <CardTitle>Expense Budgets</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="h-[300px] flex items-center justify-center bg-muted/20 rounded-md">
-                  <p className="text-muted-foreground">Budget management interface will be added in a future update</p>
-                </div>
-              </CardContent>
-            </Card>
+            <ExpenseBudget forecastId={selectedForecastId} />
           </TabsContent>
         </Tabs>
       </div>

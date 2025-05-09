@@ -29,6 +29,7 @@ const Revenue = () => {
               <TabsTrigger value="overview">Overview</TabsTrigger>
               <TabsTrigger value="drivers">Revenue Drivers</TabsTrigger>
               <TabsTrigger value="streams">Revenue Streams</TabsTrigger>
+              <TabsTrigger value="mapping">Driver-Stream Links</TabsTrigger>
             </TabsList>
           </div>
           
@@ -52,6 +53,10 @@ const Revenue = () => {
           
           <TabsContent value="streams">
             <RevenueStreams forecastId={selectedForecastId} isLoading={false} />
+          </TabsContent>
+          
+          <TabsContent value="mapping">
+            <DriverStreamMapping forecastId={selectedForecastId} />
           </TabsContent>
         </Tabs>
       </div>
