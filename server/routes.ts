@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { 
   insertUserSchema, 
+  insertSubaccountSchema,
   insertForecastSchema, 
   insertRevenueDriverSchema, 
   insertRevenueStreamSchema,
@@ -76,15 +77,91 @@ export async function registerRoutes(app: Express): Promise<Server> {
     return res.json(userData);
   });
   
-  // Forecast routes
-  app.get('/api/forecasts', async (req: Request, res: Response) => {
+  // Subaccount routes
+  app.get('/api/subaccounts', async (req: Request, res: Response) => {
     const userId = Number(req.query.userId);
     if (isNaN(userId)) {
       return res.status(400).json({ message: 'Invalid user ID' });
     }
     
-    const forecasts = await storage.getForecastsByUserId(userId);
-    return res.json(forecasts);
+    const subaccounts = await storage.getSubaccountsByUserId(userId);
+    return res.json(subaccounts);
+  });
+  
+  app.get('/api/subaccounts/:id', async (req: Request, res: Response) => {
+    const subaccountId = parseInt(req.params.id);
+    if (isNaN(subaccountId)) {
+      return res.status(400).json({ message: 'Invalid subaccount ID' });
+    }
+    
+    const subaccount = await storage.getSubaccount(subaccountId);
+    if (!subaccount) {
+      return res.status(404).json({ message: 'Subaccount not found' });
+    }
+    
+    return res.json(subaccount);
+  });
+  
+  app.post('/api/subaccounts', async (req: Request, res: Response) => {
+    try {
+      const subaccountData = insertSubaccountSchema.parse(req.body);
+      const subaccount = await storage.createSubaccount(subaccountData);
+      return res.status(201).json(subaccount);
+    } catch (err) {
+      return handleValidationError(err, res);
+    }
+  });
+  
+  app.put('/api/subaccounts/:id', async (req: Request, res: Response) => {
+    try {
+      const subaccountId = parseInt(req.params.id);
+      if (isNaN(subaccountId)) {
+        return res.status(400).json({ message: 'Invalid subaccount ID' });
+      }
+      
+      const subaccountData = insertSubaccountSchema.partial().parse(req.body);
+      const updatedSubaccount = await storage.updateSubaccount(subaccountId, subaccountData);
+      
+      if (!updatedSubaccount) {
+        return res.status(404).json({ message: 'Subaccount not found' });
+      }
+      
+      return res.json(updatedSubaccount);
+    } catch (err) {
+      return handleValidationError(err, res);
+    }
+  });
+  
+  app.delete('/api/subaccounts/:id', async (req: Request, res: Response) => {
+    const subaccountId = parseInt(req.params.id);
+    if (isNaN(subaccountId)) {
+      return res.status(400).json({ message: 'Invalid subaccount ID' });
+    }
+    
+    const success = await storage.deleteSubaccount(subaccountId);
+    if (!success) {
+      return res.status(404).json({ message: 'Subaccount not found' });
+    }
+    
+    return res.status(204).end();
+  });
+  
+  // Forecast routes
+  app.get('/api/forecasts', async (req: Request, res: Response) => {
+    const userId = Number(req.query.userId);
+    const subaccountId = Number(req.query.subaccountId);
+    
+    if (subaccountId && !isNaN(subaccountId)) {
+      // If subaccountId is provided, filter by subaccount
+      const forecasts = await storage.getForecastsBySubaccountId(subaccountId);
+      return res.json(forecasts);
+    } else if (userId && !isNaN(userId)) {
+      // If only userId is provided, filter by user
+      const forecasts = await storage.getForecastsByUserId(userId);
+      return res.json(forecasts);
+    } else {
+      return res.status(400).json({ message: 'Invalid or missing user ID or subaccount ID' });
+    }
   });
   
   app.get('/api/forecasts/:id', async (req: Request, res: Response) => {
