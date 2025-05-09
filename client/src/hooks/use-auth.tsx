@@ -45,11 +45,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     queryFn: async () => {
       try {
         const res = await apiRequest("GET", "/api/user");
-        if (res.status === 401) {
-          return null;
-        }
-        return await res.json();
+        return res;
       } catch (error) {
+        // If unauthorized or other error, just return null
         return null;
       }
     },
@@ -57,12 +55,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const loginMutation = useMutation<UserData, Error, LoginData>({
     mutationFn: async (credentials: LoginData) => {
-      const res = await apiRequest("POST", "/api/login", credentials);
-      if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.message || "Login failed");
+      try {
+        return await apiRequest("POST", "/api/login", credentials);
+      } catch (error) {
+        throw error;
       }
-      return await res.json();
     },
     onSuccess: (userData: UserData) => {
       queryClient.setQueryData(["/api/user"], userData);
@@ -78,12 +75,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const registerMutation = useMutation<UserData, Error, RegisterData>({
     mutationFn: async (userData: RegisterData) => {
-      const res = await apiRequest("POST", "/api/register", userData);
-      if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.message || "Registration failed");
+      try {
+        return await apiRequest("POST", "/api/register", userData);
+      } catch (error) {
+        throw error;
       }
-      return await res.json();
     },
     onSuccess: (userData: UserData) => {
       queryClient.setQueryData(["/api/user"], userData);
@@ -99,10 +95,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logoutMutation = useMutation<void, Error, void>({
     mutationFn: async () => {
-      const res = await apiRequest("POST", "/api/logout");
-      if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.message || "Logout failed");
+      try {
+        await apiRequest("POST", "/api/logout");
+      } catch (error) {
+        throw error;
       }
     },
     onSuccess: () => {

@@ -27,10 +27,10 @@ const defaultQueryFn: QueryFunction = async ({ queryKey }) => {
   return response.json();
 };
 
-// Function for making API requests (POST, PATCH, DELETE)
+// Function for making API requests
 export async function apiRequest(
+  method: "GET" | "POST" | "PATCH" | "DELETE" | "PUT",
   endpoint: string,
-  method: "POST" | "PATCH" | "DELETE" | "PUT",
   data?: any
 ) {
   const options: RequestInit = {

@@ -13,7 +13,10 @@ import {
   Settings,
   Menu,
   Banknote,
+  LogOut,
+  User,
 } from "lucide-react";
+import { useAuth } from "@/hooks/use-auth";
 
 import { Toaster } from "@/components/ui/toaster";
 import { Button } from "@/components/ui/button";
@@ -108,6 +111,17 @@ export function Layout({ children }: LayoutProps) {
     },
   ];
 
+  const { user, logoutMutation } = useAuth();
+  const [_, navigate] = useLocation();
+
+  const handleLogout = () => {
+    logoutMutation.mutate(undefined, {
+      onSuccess: () => {
+        navigate('/auth');
+      }
+    });
+  };
+
   return (
     <div className="flex min-h-screen">
       {/* Desktop Sidebar */}
@@ -117,16 +131,38 @@ export function Layout({ children }: LayoutProps) {
             FinanceForecast
           </h1>
         </div>
-        <nav className="space-y-1">
-          {navItems.map((item) => (
-            <NavItem
-              key={item.href}
-              href={item.href}
-              label={item.label}
-              icon={item.icon}
-              isActive={location === item.href}
-            />
-          ))}
+        <nav className="flex flex-col h-full justify-between">
+          <div className="space-y-1">
+            {navItems.map((item) => (
+              <NavItem
+                key={item.href}
+                href={item.href}
+                label={item.label}
+                icon={item.icon}
+                isActive={location === item.href}
+              />
+            ))}
+          </div>
+          
+          {user && (
+            <div className="mt-auto pt-4 border-t">
+              <div className="px-3 py-2 mb-2">
+                <div className="flex items-center space-x-2">
+                  <User className="h-5 w-5 text-muted-foreground" />
+                  <span className="text-sm font-medium truncate">{user.email}</span>
+                </div>
+              </div>
+              <Button
+                variant="outline"
+                className="w-full justify-start gap-2 text-red-500 hover:text-red-600 hover:bg-red-50"
+                onClick={handleLogout}
+                disabled={logoutMutation.isPending}
+              >
+                <LogOut className="h-4 w-4" />
+                <span>{logoutMutation.isPending ? "Logging out..." : "Logout"}</span>
+              </Button>
+            </div>
+          )}
         </nav>
       </div>
 
@@ -139,7 +175,7 @@ export function Layout({ children }: LayoutProps) {
                 FinanceForecast
               </h1>
             </div>
-            <nav className="flex-1 overflow-auto p-4">
+            <nav className="flex flex-col h-full p-4">
               <div className="space-y-1">
                 {navItems.map((item) => (
                   <NavItem
@@ -151,6 +187,26 @@ export function Layout({ children }: LayoutProps) {
                   />
                 ))}
               </div>
+              
+              {user && (
+                <div className="mt-auto pt-4 border-t">
+                  <div className="px-3 py-2 mb-2">
+                    <div className="flex items-center space-x-2">
+                      <User className="h-5 w-5 text-muted-foreground" />
+                      <span className="text-sm font-medium truncate">{user.email}</span>
+                    </div>
+                  </div>
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start gap-2 text-red-500 hover:text-red-600 hover:bg-red-50"
+                    onClick={handleLogout}
+                    disabled={logoutMutation.isPending}
+                  >
+                    <LogOut className="h-4 w-4" />
+                    <span>{logoutMutation.isPending ? "Logging out..." : "Logout"}</span>
+                  </Button>
+                </div>
+              )}
             </nav>
           </div>
         </SheetContent>
