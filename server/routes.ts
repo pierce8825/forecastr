@@ -1440,12 +1440,75 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: 'Variables must be provided as an object' });
       }
       
-      // In a real implementation, this would use a math expression evaluation library
-      // For the MVP, we'll just return a placeholder result
-      return res.json({ result: 1000000 });
+      // Import math.js dynamically to avoid issues with SSR/browser environments
+      const math = require('mathjs');
+      
+      try {
+        // Validate the formula by attempting to parse it
+        math.parse(formula);
+
+        // Replace variable names with their values
+        let calculationFormula = formula;
+        
+        // Replace entity references like stream_1, driver_2 with their values
+        const refRegex = /(stream|driver|expense|personnel)_(\d+)/g;
+        calculationFormula = calculationFormula.replace(refRegex, (match) => {
+          if (variables[match] !== undefined) {
+            return variables[match].toString();
+          }
+          return '0'; // Default to 0 if variable not found
+        });
+        
+        // Replace any remaining variables
+        Object.keys(variables).forEach(varName => {
+          // Use a regex to match the exact variable name (not as a substring)
+          const varRegex = new RegExp(`\\b${varName}\\b`, 'g');
+          calculationFormula = calculationFormula.replace(varRegex, variables[varName]);
+        });
+        
+        // Evaluate the formula
+        const result = math.evaluate(calculationFormula);
+        
+        // Check if result is a valid number
+        if (isNaN(result) || !isFinite(result)) {
+          return res.status(400).json({ 
+            message: 'Formula evaluation resulted in an invalid number',
+            isValid: false,
+            error: {
+              message: 'Invalid result',
+              type: 'calculation',
+              details: 'The formula evaluation resulted in NaN or Infinity'
+            }
+          });
+        }
+        
+        return res.json({ 
+          result, 
+          isValid: true 
+        });
+      } catch (error) {
+        // Formula is invalid or calculation failed
+        return res.status(400).json({ 
+          message: 'Invalid formula',
+          isValid: false,
+          error: {
+            message: error.message || 'Syntax error in formula',
+            type: 'syntax',
+            details: error.toString()
+          }
+        });
+      }
     } catch (err) {
       console.error('Error calculating formula:', err);
-      return res.status(500).json({ message: 'Error calculating formula' });
+      return res.status(500).json({ 
+        message: 'Error calculating formula',
+        isValid: false,
+        error: {
+          message: 'Server error while processing formula',
+          type: 'server',
+          details: err.toString()
+        }
+      });
     }
   });
   
