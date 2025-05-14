@@ -390,6 +390,43 @@ export const insertPayrollItemSchema = createInsertSchema(payrollItems).omit({
 export type PayrollItem = typeof payrollItems.$inferSelect;
 export type InsertPayrollItem = z.infer<typeof insertPayrollItemSchema>;
 
+// Chat Assistant schema
+export const chatConversations = pgTable("chat_conversations", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  subaccountId: integer("subaccount_id"),
+  forecastId: integer("forecast_id"),
+  name: text("name").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const chatMessages = pgTable("chat_messages", {
+  id: serial("id").primaryKey(),
+  conversationId: integer("conversation_id").notNull(),
+  role: text("role").notNull(), // user or assistant
+  content: text("content").notNull(),
+  metadata: jsonb("metadata"), // Store context about modifications made
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertChatConversationSchema = createInsertSchema(chatConversations).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertChatMessageSchema = createInsertSchema(chatMessages).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type ChatConversation = typeof chatConversations.$inferSelect;
+export type InsertChatConversation = z.infer<typeof insertChatConversationSchema>;
+
+export type ChatMessage = typeof chatMessages.$inferSelect;
+export type InsertChatMessage = z.infer<typeof insertChatMessageSchema>;
+
 // Define the relationships between tables
 export const relations = {
   users: {
@@ -403,6 +440,19 @@ export const relations = {
         many: {
           table: subaccounts,
           field: subaccounts.userId,
+        },
+      },
+    },
+    chatConversations: {
+      // One user can have many chat conversations
+      relationDef: {
+        one: {
+          table: users,
+          field: users.id,
+        },
+        many: {
+          table: chatConversations,
+          field: chatConversations.userId,
         },
       },
     },
@@ -474,6 +524,36 @@ export const relations = {
         many: {
           table: payrollItems,
           field: payrollItems.payrollId,
+        },
+      },
+    },
+  },
+  chatConversations: {
+    messages: {
+      // One conversation can have many messages
+      relationDef: {
+        one: {
+          table: chatConversations,
+          field: chatConversations.id,
+        },
+        many: {
+          table: chatMessages,
+          field: chatMessages.conversationId,
+        },
+      },
+    },
+  },
+  forecasts: {
+    chatConversations: {
+      // One forecast can have many chat conversations
+      relationDef: {
+        one: {
+          table: forecasts,
+          field: forecasts.id,
+        },
+        many: {
+          table: chatConversations,
+          field: chatConversations.forecastId,
         },
       },
     },
