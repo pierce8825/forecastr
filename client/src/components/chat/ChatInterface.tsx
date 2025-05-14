@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Send, Plus, ArrowRight } from "lucide-react";
+import { Send, Plus, ArrowRight, Lightbulb, TrendingUp, CreditCard, Users, DollarSign } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -9,6 +9,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { ChadAvatar } from "./ChadAvatar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface Message {
   id?: number;
@@ -32,6 +34,79 @@ export default function ChatInterface({ forecastId, onFinancialUpdate }: ChatInt
   const [processing, setProcessing] = useState(false);
   const [newConversationName, setNewConversationName] = useState("");
   const [isCreatingConversation, setIsCreatingConversation] = useState(false);
+  const [showPromptSuggestions, setShowPromptSuggestions] = useState(false);
+  
+  // Template prompts for common financial changes
+  const templatePrompts = {
+    revenue: [
+      {
+        title: "Add Subscription Revenue",
+        prompt: "Add a new SaaS subscription revenue stream of $4,500 per month with an expected annual growth rate of 8%.",
+        icon: <TrendingUp className="h-4 w-4" />
+      },
+      {
+        title: "Add One-time Revenue",
+        prompt: "Add a one-time revenue item of $25,000 for consulting services in Q3.",
+        icon: <DollarSign className="h-4 w-4" />
+      },
+      {
+        title: "Add Service Revenue",
+        prompt: "Add a new service revenue stream for web development at $150/hour with an estimated 80 hours per month.",
+        icon: <TrendingUp className="h-4 w-4" />
+      }
+    ],
+    expenses: [
+      {
+        title: "Add Marketing Expense",
+        prompt: "Add a new marketing expense of $3,000 per month for digital ads.",
+        icon: <CreditCard className="h-4 w-4" />
+      },
+      {
+        title: "Add Software Expense",
+        prompt: "Add a new software expense of $200 per month for project management tools.",
+        icon: <CreditCard className="h-4 w-4" />
+      },
+      {
+        title: "Add Office Expense",
+        prompt: "Add a new office rent expense of $5,500 per month with a 3% annual increase.",
+        icon: <CreditCard className="h-4 w-4" />
+      }
+    ],
+    personnel: [
+      {
+        title: "Add Developer Role",
+        prompt: "Add a new software developer role with an annual salary of $120,000 plus 20% benefits.",
+        icon: <Users className="h-4 w-4" />
+      },
+      {
+        title: "Add Marketing Role",
+        prompt: "Add a new marketing manager role with an annual salary of $85,000 plus 18% benefits.",
+        icon: <Users className="h-4 w-4" />
+      },
+      {
+        title: "Add Sales Role",
+        prompt: "Add two new sales representatives with annual salaries of $75,000 each plus 15% benefits and 5% commission.",
+        icon: <Users className="h-4 w-4" />
+      }
+    ],
+    optimization: [
+      {
+        title: "Request Cost Analysis",
+        prompt: "Analyze my current expenses and suggest areas where I could reduce costs without impacting growth.",
+        icon: <Lightbulb className="h-4 w-4" />
+      },
+      {
+        title: "Revenue Optimization",
+        prompt: "Based on my current revenue streams, what opportunities do you see for increasing revenue or improving pricing?",
+        icon: <Lightbulb className="h-4 w-4" />
+      },
+      {
+        title: "Staffing Efficiency",
+        prompt: "Analyze my current personnel costs and suggest any optimizations for my staffing plan.",
+        icon: <Lightbulb className="h-4 w-4" />
+      }
+    ]
+  };
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Fetch conversations
