@@ -115,11 +115,15 @@ export default function FormulaBuilder({
   
   // Try to calculate formula when it changes
   useEffect(() => {
-    calculateFormula();
+    const timer = setTimeout(() => {
+      calculateFormula();
+    }, 300); // Add debounce to avoid too many API calls
+    
+    return () => clearTimeout(timer);
   }, [formula]);
   
   // Calculate formula and check for circular dependencies
-  const calculateFormula = () => {
+  const calculateFormula = async () => {
     if (!formula.trim()) {
       setCalculatedValue(null);
       setError(null);
@@ -129,9 +133,10 @@ export default function FormulaBuilder({
     }
     
     try {
-      // Check if formula is valid syntax
-      if (!formulaParser.validate(formula)) {
-        setError("Invalid formula syntax");
+      // First perform client-side validation for quick feedback
+      const validation = formulaParser.validateWithDetails(formula);
+      if (!validation.isValid) {
+        setError(validation.error?.message || "Invalid formula syntax");
         setCalculatedValue(null);
         return;
       }
@@ -187,14 +192,36 @@ export default function FormulaBuilder({
         }
       }
       
-      // Evaluate formula
-      formulaParser.setVariables(variables);
-      const result = formulaParser.evaluate(formula);
-      setCalculatedValue(result);
-      setError(null);
+      // Perform server-side validation and calculation
+      try {
+        const response = await fetch('/api/calculate-formula', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ formula, variables }),
+        });
+        
+        const result = await response.json();
+        
+        if (!response.ok || !result.isValid) {
+          setError(result.error?.message || "Server validation failed: Invalid formula");
+          setCalculatedValue(null);
+          return;
+        }
+        
+        // Use the server-calculated result
+        setCalculatedValue(result.result);
+        setError(null);
+      } catch (serverError) {
+        // Fall back to client-side calculation if server request fails
+        console.warn("Server calculation failed, falling back to client-side:", serverError);
+        formulaParser.setVariables(variables);
+        const result = formulaParser.evaluate(formula);
+        setCalculatedValue(result);
+        setError(null);
+      }
     } catch (error) {
       console.error("Formula calculation error:", error);
-      setError("Error calculating formula: " + (error as Error).message);
+      setError("Error calculating formula: " + (error instanceof Error ? error.message : String(error)));
       setCalculatedValue(null);
     }
   };

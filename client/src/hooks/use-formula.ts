@@ -57,15 +57,53 @@ export function useFormula(forecastId: number) {
     },
   });
 
-  // Validate a formula syntax
-  const validateFormula = async (formula: string): Promise<boolean> => {
+  // Validate a formula syntax with detailed error information
+  const validateFormula = async (formula: string): Promise<{isValid: boolean; error?: string}> => {
     setIsValidating(true);
     try {
-      // Try to parse the formula to check for syntax errors
-      const isValid = formulaParser.validate(formula);
-      return isValid;
+      // First do client-side validation for quick feedback
+      const clientValidation = formulaParser.validateWithDetails(formula);
+      if (!clientValidation.isValid) {
+        return {
+          isValid: false,
+          error: clientValidation.error?.message || 'Invalid formula syntax'
+        };
+      }
+      
+      // If client validation passes, do a more thorough server-side validation
+      // Create variables object with basic placeholders for validation
+      const variables: Record<string, number> = {};
+      
+      // Extract entity references from formula
+      const regex = /(stream|driver|expense|personnel)_(\d+)/g;
+      let match;
+      while ((match = regex.exec(formula)) !== null) {
+        const referenceName = match[0];
+        variables[referenceName] = 1; // Use placeholder value for validation
+      }
+      
+      // Call server to validate and calculate
+      const response = await fetch('/api/calculate-formula', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ formula, variables }),
+      });
+      
+      const result = await response.json();
+      
+      if (!response.ok || !result.isValid) {
+        return {
+          isValid: false,
+          error: result.error?.message || 'Server validation failed: Invalid formula'
+        };
+      }
+      
+      return { isValid: true };
     } catch (error) {
-      return false;
+      return { 
+        isValid: false,
+        error: error instanceof Error ? error.message : 'Unknown validation error'
+      };
     } finally {
       setIsValidating(false);
     }
@@ -80,9 +118,9 @@ export function useFormula(forecastId: number) {
     category?: string;
   }) => {
     // Validate formula before saving
-    const isValid = await validateFormula(formulaData.formula);
-    if (!isValid) {
-      throw new Error("Invalid formula syntax");
+    const validation = await validateFormula(formulaData.formula);
+    if (!validation.isValid) {
+      throw new Error(validation.error || "Invalid formula syntax");
     }
 
     // Call the mutation
