@@ -23,6 +23,7 @@ import { ZodError } from "zod";
 import { fromZodError } from "zod-validation-error";
 import puzzleRouter from "./routes/puzzle";
 import { setupAuth } from "./auth";
+import * as math from 'mathjs';
 
 // Extend Express Request to include resource property
 interface Request extends ExpressRequest {
@@ -1440,8 +1441,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: 'Variables must be provided as an object' });
       }
       
-      // Import math.js dynamically to avoid issues with SSR/browser environments
-      const math = require('mathjs');
+      // Math.js is already imported at the top of the file
       
       try {
         // Validate the formula by attempting to parse it

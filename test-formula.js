@@ -1,5 +1,5 @@
 // Simple script to test the formula validation endpoint
-const fetch = require('node-fetch');
+import fetch from 'node-fetch';
 
 async function testFormulaValidation() {
   const testCases = [
