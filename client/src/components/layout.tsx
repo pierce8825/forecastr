@@ -1,5 +1,5 @@
 import React from "react";
-import { Link, useLocation } from "wouter";
+import { useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 import {
   BarChart3,
@@ -17,6 +17,7 @@ import {
   User,
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
+import { useNavigationValidator } from "@/lib/navigation-validator";
 
 import { Toaster } from "@/components/ui/toaster";
 import { Button } from "@/components/ui/button";
@@ -38,8 +39,23 @@ interface NavItemProps {
 }
 
 function NavItem({ href, label, icon, isActive }: NavItemProps) {
+  const { validateNavigation } = useNavigationValidator();
+  const [_, navigate] = useLocation();
+  
+  const handleNavigation = (e: React.MouseEvent) => {
+    // Skip validation if already on this page
+    if (isActive) return;
+    
+    e.preventDefault();
+    
+    // Validate formulas before navigation
+    if (validateNavigation(href)) {
+      navigate(href);
+    }
+  };
+  
   return (
-    <Link href={href}>
+    <a href={href} onClick={handleNavigation}>
       <Button
         variant={isActive ? "default" : "ghost"}
         className={cn(
@@ -50,7 +66,7 @@ function NavItem({ href, label, icon, isActive }: NavItemProps) {
         {icon}
         <span>{label}</span>
       </Button>
-    </Link>
+    </a>
   );
 }
 

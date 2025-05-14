@@ -7,6 +7,9 @@ import { Input } from '@/components/ui/input';
 import { AccountsList } from '@/components/puzzle/accounts-list';
 import { FinancialReport, ReportType } from '@/components/puzzle/financial-report';
 import { usePuzzle, PuzzleIntegrationResponse } from '@/hooks/use-puzzle';
+import { debugFormulas } from '@/lib/formula-debugger';
+import { validateAllFormulas } from '@/lib/navigation-validator';
+import { useToast } from '@/hooks/use-toast';
 
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState('general');

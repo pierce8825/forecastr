@@ -276,9 +276,23 @@ export default function FormulaBuilder({
   
   // Handle save
   const handleSave = () => {
-    if (calculatedValue !== null) {
+    // Only allow saving if formula is valid (calculatedValue is not null)
+    // and there are no errors
+    if (calculatedValue !== null && error === null) {
+      // If there's a warning (like circular dependencies), show a confirmation dialog
+      if (warning) {
+        if (!confirm(`Warning: ${warning}. Are you sure you want to save this formula?`)) {
+          return;
+        }
+      }
+      
       onSave(formula, calculatedValue);
       onClose();
+    } else if (error) {
+      // Show error message more prominently
+      setError(`Cannot save: ${error}`);
+    } else if (calculatedValue === null) {
+      setError("Cannot save: Formula result is invalid");
     }
   };
   
