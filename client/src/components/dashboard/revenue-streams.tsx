@@ -70,9 +70,44 @@ export function RevenueStreams({ forecastId, isLoading }: RevenueStreamsProps) {
   });
 
   // Handle form submission
-  const handleAddStream = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleAddStream = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
+    
+    const formula = formData.get("formula") as string || null;
+    
+    // Validate formula if one is provided
+    if (formula) {
+      try {
+        // Validate against server
+        const response = await fetch('/api/calculate-formula', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            formula, 
+            variables: {} // Empty variables for basic syntax check
+          }),
+        });
+        
+        const result = await response.json();
+        
+        if (!response.ok || !result.isValid) {
+          toast({
+            title: "Formula Error",
+            description: result.error?.message || "Invalid formula. Please check your syntax.",
+            variant: "destructive",
+          });
+          return;
+        }
+      } catch (error) {
+        toast({
+          title: "Validation Error",
+          description: "Could not validate formula. Please try again.",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
     
     const streamData = {
       forecastId,
@@ -80,7 +115,7 @@ export function RevenueStreams({ forecastId, isLoading }: RevenueStreamsProps) {
       type: formData.get("type"),
       frequency: formData.get("frequency"),
       amount: formData.get("amount"),
-      formula: formData.get("formula") || null,
+      formula: formula,
       startDate: formData.get("startDate") || null,
       endDate: formData.get("endDate") || null,
     };

@@ -58,9 +58,14 @@ export function useFormula(forecastId: number) {
   });
 
   // Validate a formula syntax with detailed error information
-  const validateFormula = async (formula: string): Promise<{isValid: boolean; error?: string}> => {
+  const validateFormula = async (formula: string): Promise<{isValid: boolean; error?: string; result?: number}> => {
     setIsValidating(true);
     try {
+      // If formula is empty, consider it valid (no formula means no validation needed)
+      if (!formula || formula.trim() === '') {
+        return { isValid: true };
+      }
+      
       // First do client-side validation for quick feedback
       const clientValidation = formulaParser.validateWithDetails(formula);
       if (!clientValidation.isValid) {
@@ -98,7 +103,10 @@ export function useFormula(forecastId: number) {
         };
       }
       
-      return { isValid: true };
+      return { 
+        isValid: true,
+        result: result.result 
+      };
     } catch (error) {
       return { 
         isValid: false,
