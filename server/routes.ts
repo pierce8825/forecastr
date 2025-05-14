@@ -22,6 +22,7 @@ import {
 import { ZodError } from "zod";
 import { fromZodError } from "zod-validation-error";
 import puzzleRouter from "./routes/puzzle";
+import chatRouter from "./routes/chat";
 import { setupAuth } from "./auth";
 import * as math from 'mathjs';
 
@@ -1514,6 +1515,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Register Puzzle.io routes
   app.use('/api/puzzle', puzzleRouter);
+  app.use('/api/chat', chatRouter);
 
   const httpServer = createServer(app);
   return httpServer;

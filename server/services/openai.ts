@@ -133,9 +133,9 @@ export async function generateChadResponse(
     await storage.createChatMessage(assistantChatMessage);
 
     return assistantResponse;
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error generating Chad response:", error);
-    throw new Error(`Failed to generate response: ${error.message}`);
+    throw new Error(`Failed to generate response: ${error.message || 'Unknown error'}`);
   }
 }
 
@@ -228,9 +228,9 @@ export async function processChadRecommendation(
       response: parsedResponse.explanation,
       changes: parsedResponse.changes,
     };
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error processing recommendation:", error);
-    throw new Error(`Failed to process recommendation: ${error.message}`);
+    throw new Error(`Failed to process recommendation: ${error.message || 'Unknown error'}`);
   }
 }
 
