@@ -15,9 +15,12 @@ import {
   Payroll, InsertPayroll,
   PayrollItem, InsertPayrollItem,
   ExpenseBudget, InsertExpenseBudget,
+  ChatConversation, InsertChatConversation,
+  ChatMessage, InsertChatMessage,
   users, subaccounts, forecasts, revenueDrivers, revenueStreams, revenueDriverToStream,
   expenses, departments, personnelRoles, customFormulas, puzzleIntegrations,
-  financialProjections, employees, payrolls, payrollItems, expenseBudgets
+  financialProjections, employees, payrolls, payrollItems, expenseBudgets,
+  chatConversations, chatMessages
 } from "@shared/schema";
 
 import { db } from "./db";
@@ -29,6 +32,16 @@ export interface IStorage {
   getUserByUsername(username: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
+  
+  // Chat operations
+  getChatConversationsByUserId(userId: number): Promise<ChatConversation[]>;
+  getChatConversation(id: number): Promise<ChatConversation | undefined>;
+  createChatConversation(conversation: InsertChatConversation): Promise<ChatConversation>;
+  updateChatConversation(id: number, data: Partial<InsertChatConversation>): Promise<ChatConversation | undefined>;
+  deleteChatConversation(id: number): Promise<boolean>;
+  getChatMessagesByConversationId(conversationId: number, limit?: number): Promise<ChatMessage[]>;
+  getChatMessage(id: number): Promise<ChatMessage | undefined>;
+  createChatMessage(message: InsertChatMessage): Promise<ChatMessage>;
   
   // Subaccount operations
   getSubaccountsByUserId(userId: number): Promise<Subaccount[]>;
@@ -857,6 +870,78 @@ export class DatabaseStorage implements IStorage {
       .where(eq(payrollItems.id, id))
       .returning();
     return !!deletedPayrollItem;
+  }
+
+  // Chat Conversation operations
+  async getChatConversationsByUserId(userId: number): Promise<ChatConversation[]> {
+    return await db
+      .select()
+      .from(chatConversations)
+      .where(eq(chatConversations.userId, userId));
+  }
+
+  async getChatConversation(id: number): Promise<ChatConversation | undefined> {
+    const [conversation] = await db
+      .select()
+      .from(chatConversations)
+      .where(eq(chatConversations.id, id));
+    return conversation || undefined;
+  }
+
+  async createChatConversation(insertConversation: InsertChatConversation): Promise<ChatConversation> {
+    const [conversation] = await db
+      .insert(chatConversations)
+      .values(insertConversation)
+      .returning();
+    return conversation;
+  }
+
+  async updateChatConversation(id: number, updateData: Partial<InsertChatConversation>): Promise<ChatConversation | undefined> {
+    const [updatedConversation] = await db
+      .update(chatConversations)
+      .set(updateData)
+      .where(eq(chatConversations.id, id))
+      .returning();
+    return updatedConversation || undefined;
+  }
+
+  async deleteChatConversation(id: number): Promise<boolean> {
+    const [deletedConversation] = await db
+      .delete(chatConversations)
+      .where(eq(chatConversations.id, id))
+      .returning();
+    return !!deletedConversation;
+  }
+
+  // Chat Message operations
+  async getChatMessagesByConversationId(conversationId: number, limit?: number): Promise<ChatMessage[]> {
+    let query = db
+      .select()
+      .from(chatMessages)
+      .where(eq(chatMessages.conversationId, conversationId))
+      .orderBy(chatMessages.createdAt);
+    
+    if (limit) {
+      query = query.limit(limit);
+    }
+    
+    return await query;
+  }
+
+  async getChatMessage(id: number): Promise<ChatMessage | undefined> {
+    const [message] = await db
+      .select()
+      .from(chatMessages)
+      .where(eq(chatMessages.id, id));
+    return message || undefined;
+  }
+
+  async createChatMessage(insertMessage: InsertChatMessage): Promise<ChatMessage> {
+    const [message] = await db
+      .insert(chatMessages)
+      .values(insertMessage)
+      .returning();
+    return message;
   }
 }
 
