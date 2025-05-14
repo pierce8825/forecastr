@@ -564,6 +564,8 @@ export default function FormulaBuilder({
           <Button 
             onClick={handleSave} 
             disabled={calculatedValue === null || error !== null || isCalculating}
+            className={error ? "bg-red-100 hover:bg-red-200 text-red-800 hover:text-red-800" : ""}
+            variant={error ? "outline" : "default"}
           >
             {isCalculating ? 'Validating...' : error ? 'Formula Has Errors' : warning ? 'Save Anyway' : 'Save Formula'}
           </Button>

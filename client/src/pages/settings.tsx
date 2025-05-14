@@ -15,7 +15,9 @@ export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState('general');
   const [apiKey, setApiKey] = useState('');
   const [workspaceId, setWorkspaceId] = useState('');
+  const [debugResult, setDebugResult] = useState<any>(null);
   const { isAuthorized, isConnecting, isLoading, integration, connectPuzzle, disconnectPuzzle } = usePuzzle();
+  const { toast } = useToast();
   // Explicitly define the type for the integration data
   const puzzleIntegration: {
     id?: number;
@@ -196,6 +198,76 @@ export default function SettingsPage() {
               <p className="text-sm text-muted-foreground">
                 Security settings will be added here.
               </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Formula Validation</CardTitle>
+              <CardDescription>
+                Validate all formulas in your financial models to prevent calculation errors.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Use these tools to check your formulas for errors, circular references, or invalid entities.
+              </p>
+              
+              <div className="flex flex-wrap gap-4">
+                <Button 
+                  variant="secondary"
+                  onClick={() => {
+                    const result = debugFormulas();
+                    setDebugResult(result);
+                    toast({
+                      title: "Formula Debugging Complete",
+                      description: `Found ${result.invalidFormulas.length} invalid formulas out of ${result.entitiesWithFormulas} total formulas.`,
+                    });
+                  }}
+                >
+                  Debug All Formulas
+                </Button>
+                
+                <Button
+                  variant="secondary"
+                  onClick={() => {
+                    const isValid = validateAllFormulas();
+                    toast({
+                      title: isValid ? "All Formulas Valid" : "Invalid Formulas Found",
+                      description: isValid 
+                        ? "All formulas passed validation checks." 
+                        : "Some formulas have errors or circular references. Check the console for details.",
+                      variant: isValid ? "default" : "destructive",
+                    });
+                  }}
+                >
+                  Validate All Formulas
+                </Button>
+              </div>
+              
+              {debugResult && (
+                <div className="mt-4 p-4 border rounded-md bg-slate-50">
+                  <h3 className="text-sm font-medium mb-2">Debug Results</h3>
+                  <div className="space-y-2 text-sm">
+                    <p>Total entities: {debugResult.totalEntities}</p>
+                    <p>Entities with formulas: {debugResult.entitiesWithFormulas}</p>
+                    <p>Circular dependencies: {debugResult.hasCircularDependencies ? 'Yes' : 'No'}</p>
+                    <p>Invalid formulas: {debugResult.invalidFormulas.length}</p>
+                  </div>
+                  {debugResult.invalidFormulas.length > 0 && (
+                    <div className="mt-2">
+                      <p className="text-xs font-medium text-red-600 mb-1">Invalid Formulas:</p>
+                      <ul className="text-xs space-y-1">
+                        {debugResult.invalidFormulas.map((entity: any, index: number) => (
+                          <li key={index} className="text-red-600">
+                            {entity.type} {entity.id} ({entity.name}): {entity.formula}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
