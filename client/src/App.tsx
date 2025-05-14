@@ -36,6 +36,7 @@ function AppRoutes() {
         <ProtectedRoute path="/scenarios" component={Scenarios} />
         <ProtectedRoute path="/payroll" component={Payroll} />
         <ProtectedRoute path="/reports" component={Reports} />
+        <ProtectedRoute path="/ai-advisor" component={AIAdvisor} />
         <ProtectedRoute path="/settings" component={Settings} />
         <Route path="/auth" component={AuthPage} />
         <Route component={NotFound} />

@@ -15,6 +15,7 @@ import {
   Banknote,
   LogOut,
   User,
+  BrainCircuit,
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { useNavigationValidator } from "@/lib/navigation-validator";
@@ -119,6 +120,11 @@ export function Layout({ children }: LayoutProps) {
       href: "/reports",
       label: "Reports",
       icon: <FileText className="h-4 w-4" />,
+    },
+    {
+      href: "/ai-advisor",
+      label: "AI Advisor",
+      icon: <BrainCircuit className="h-4 w-4" />,
     },
     {
       href: "/settings",
