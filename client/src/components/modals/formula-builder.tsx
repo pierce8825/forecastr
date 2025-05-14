@@ -53,6 +53,7 @@ export default function FormulaBuilder({
   const [warning, setWarning] = useState<string | null>(null);
   const [selectedEntity, setSelectedEntity] = useState<EntityValue | null>(null);
   const [circularDependencies, setCircularDependencies] = useState<EntityValue[]>([]);
+  const [isCalculating, setIsCalculating] = useState(false);
   
   // Operators for formula building
   const operators = ['+', '-', '*', '/', '(', ')', '=', '>', '<', '>=', '<='];
@@ -132,12 +133,16 @@ export default function FormulaBuilder({
       return;
     }
     
+    // Set loading state
+    setIsCalculating(true);
+    
     try {
       // First perform client-side validation for quick feedback
       const validation = formulaParser.validateWithDetails(formula);
       if (!validation.isValid) {
         setError(validation.error?.message || "Invalid formula syntax");
         setCalculatedValue(null);
+        setIsCalculating(false);
         return;
       }
       
@@ -223,6 +228,8 @@ export default function FormulaBuilder({
       console.error("Formula calculation error:", error);
       setError("Error calculating formula: " + (error instanceof Error ? error.message : String(error)));
       setCalculatedValue(null);
+    } finally {
+      setIsCalculating(false);
     }
   };
   
@@ -442,10 +449,15 @@ export default function FormulaBuilder({
                     <AlertTitle>Error</AlertTitle>
                     <AlertDescription>{error}</AlertDescription>
                   </Alert>
+                ) : isCalculating ? (
+                  <div className="flex flex-col items-center justify-center h-full">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary mb-2"></div>
+                    <p className="text-sm text-muted-foreground">Validating formula...</p>
+                  </div>
                 ) : formula ? (
                   <div>
                     <div className="text-xl font-semibold">
-                      {calculatedValue !== null ? `$${calculatedValue.toLocaleString()}` : 'Calculating...'}
+                      {calculatedValue !== null ? `$${calculatedValue.toLocaleString()}` : 'Enter a valid formula'}
                     </div>
                     
                     {warning && (
@@ -537,9 +549,9 @@ export default function FormulaBuilder({
           </Button>
           <Button 
             onClick={handleSave} 
-            disabled={calculatedValue === null || error !== null}
+            disabled={calculatedValue === null || error !== null || isCalculating}
           >
-            {error ? 'Formula Has Errors' : warning ? 'Save Anyway' : 'Save Formula'}
+            {isCalculating ? 'Validating...' : error ? 'Formula Has Errors' : warning ? 'Save Anyway' : 'Save Formula'}
           </Button>
         </DialogFooter>
       </DialogContent>
