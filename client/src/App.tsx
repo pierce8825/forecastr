@@ -16,6 +16,7 @@ import Scenarios from "@/pages/scenarios";
 import Reports from "@/pages/reports";
 import Settings from "@/pages/settings";
 import Payroll from "@/pages/payroll";
+import AIAdvisor from "@/pages/ai-advisor";
 import NotFound from "@/pages/not-found";
 import AuthPage from "@/pages/auth-page";
 
